@@ -312,6 +312,182 @@ function Functions.getSelectedSprinklersString()
     return #selectionText > 50 and (selectionText:sub(1, 47) .. "...") or selectionText
 end
 
+-- Auto Shovel Function for Grow A Garden Script
+-- Variables
+local selectedFruitTypes = {}
+local weightThreshold = 30
+local autoShovelEnabled = false
+local autoShovelConnection = nil
+
+-- Services (using existing from main Functions)
+local Remove_Item = RemoveItem or (ReplicatedStorage.GameEvents and ReplicatedStorage.GameEvents.Remove_Item)
+
+-- Auto Shovel Functions
+function Functions.autoShovelEquipShovel()
+    if not player.Character then return end
+    local backpack = player:FindFirstChild("Backpack")
+    local shovel = backpack and backpack:FindFirstChild(shovelName)
+    if shovel then
+        shovel.Parent = player.Character
+    end
+end
+
+function Functions.getFruitTypes()
+    local fruitTypes = {}
+    local success, plantsPhysical = pcall(function()
+        return Workspace.Farm.Farm.Important.Plants_Physical
+    end)
+    
+    if not success or not plantsPhysical then return fruitTypes end
+    
+    for _, plant in pairs(plantsPhysical:GetChildren()) do
+        if plant:FindFirstChild("Fruits") then
+            table.insert(fruitTypes, plant.Name)
+        end
+    end
+    
+    return fruitTypes
+end
+
+function Functions.shouldShovelFruit(fruit)
+    if not fruit:FindFirstChild("Weight") then return false end
+    local success, weight = pcall(function()
+        return fruit.Weight.Value
+    end)
+    if not success then return false end
+    return weight < weightThreshold
+end
+
+function Functions.shovelFruit(fruit)
+    Functions.autoShovelEquipShovel()
+    task.wait(0.1)
+    
+    -- Fire the remove event
+    if Remove_Item then
+        pcall(function()
+            Remove_Item:FireServer(fruit)
+        end)
+    end
+end
+
+function Functions.autoShovel()
+    if not autoShovelEnabled then return end
+    
+    local success, plantsPhysical = pcall(function()
+        return Workspace.Farm.Farm.Important.Plants_Physical
+    end)
+    
+    if not success or not plantsPhysical then return end
+    
+    for _, fruitType in pairs(selectedFruitTypes) do
+        if fruitType ~= "None" then
+            local plant = plantsPhysical:FindFirstChild(fruitType)
+            if plant and plant:FindFirstChild("Fruits") then
+                local fruits = plant.Fruits:GetChildren()
+                
+                for _, fruit in pairs(fruits) do
+                    if Functions.shouldShovelFruit(fruit) then
+                        Functions.shovelFruit(fruit)
+                        task.wait(0.1) -- Small delay between shoveling
+                    end
+                end
+            end
+        end
+    end
+end
+
+function Functions.refreshFruitList()
+    local newOptions = {"None"}
+    for _, fruitType in ipairs(Functions.getFruitTypes()) do
+        table.insert(newOptions, fruitType)
+    end
+    
+    -- Return options for manual dropdown update
+    return newOptions
+end
+
+function Functions.clearSelectedFruits()
+    selectedFruitTypes = {}
+end
+
+function Functions.addFruitToSelection(fruitName)
+    if not table.find(selectedFruitTypes, fruitName) then
+        table.insert(selectedFruitTypes, fruitName)
+    end
+end
+
+function Functions.setFruitWeightThreshold(weight)
+    local num = tonumber(weight)
+    if num and num >= 0 and num <= 500 then
+        weightThreshold = num
+        return true
+    end
+    return false
+end
+
+function Functions.setSelectedFruits(fruitArray)
+    selectedFruitTypes = fruitArray or {}
+end
+
+function Functions.getSelectedFruits()
+    return selectedFruitTypes
+end
+
+function Functions.toggleAutoShovel(enabled, OrionLib)
+    autoShovelEnabled = enabled
+    
+    if enabled then
+        if autoShovelConnection then autoShovelConnection:Disconnect() end
+        autoShovelConnection = RunService.Heartbeat:Connect(function()
+            if autoShovelEnabled then
+                Functions.autoShovel()
+                task.wait(1) -- Check every second
+            end
+        end)
+        
+        if OrionLib then
+            OrionLib:MakeNotification({
+                Name = "Auto Shovel",
+                Content = "Auto Shovel enabled",
+                Time = 2
+            })
+        end
+    else
+        if autoShovelConnection then
+            autoShovelConnection:Disconnect()
+            autoShovelConnection = nil
+        end
+        
+        if OrionLib then
+            OrionLib:MakeNotification({
+                Name = "Auto Shovel",
+                Content = "Auto Shovel disabled",
+                Time = 2
+            })
+        end
+    end
+end
+
+-- Export auto shovel variables
+Functions.selectedFruitTypes = selectedFruitTypes
+Functions.weightThreshold = weightThreshold
+Functions.autoShovelEnabled = autoShovelEnabled
+
+-- Cleanup function update
+local originalCleanup = Functions.cleanup
+function Functions.cleanup()
+    -- Call original cleanup
+    if originalCleanup then
+        originalCleanup()
+    end
+    
+    -- Clean up auto shovel connection
+    if autoShovelConnection then
+        autoShovelConnection:Disconnect()
+        autoShovelConnection = nil
+    end
+end
+
 -- Remove Farms function
 function Functions.removeFarms(OrionLib)
     local farmFolder = Workspace:FindFirstChild("Farm")
