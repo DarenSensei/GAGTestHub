@@ -29,58 +29,6 @@ local selectedSprinklers = {}
 local autoBuyEnabled = false
 local buyConnection = nil
 
--- AUTO SHOVEL VARIABLES (Added from Script 2)
-local selectedFruitTypes = {}
-local weightThreshold = 30
-local autoShovelEnabled = false
-local autoShovelConnection = nil
-
--- AUTO SHOVEL HELPER FUNCTIONS (Added from Script 2)
-local function getFruitTypes()
-    -- Get all unique fruit types from the game
-    local fruitTypes = {}
-    local success, plantsPhysical = pcall(function()
-        return workspace.Farm.Farm.Important.Plants_Physical
-    end)
-    
-    if success and plantsPhysical then
-        for _, plant in pairs(plantsPhysical:GetChildren()) do
-            if plant:FindFirstChild("Fruits") then
-                for _, fruit in pairs(plant.Fruits:GetChildren()) do
-                    local fruitName = fruit.Name
-                    if not table.find(fruitTypes, fruitName) then
-                        table.insert(fruitTypes, fruitName)
-                    end
-                end
-            end
-        end
-    end
-    
-    return fruitTypes
-end
-
-local function clearSelectedFruits()
-    selectedFruitTypes = {}
-end
-
-local function addFruitToSelection(fruitName)
-    if not table.find(selectedFruitTypes, fruitName) then
-        table.insert(selectedFruitTypes, fruitName)
-    end
-end
-
-local function getSelectedFruitsCount()
-    return #selectedFruitTypes
-end
-
-local function getSelectedFruitsString()
-    if #selectedFruitTypes == 0 then
-        return "None"
-    end
-    local selectionText = table.concat(selectedFruitTypes, ", ")
-    return #selectionText > 50 and (selectionText:sub(1, 47) .. "...") or selectionText
-end
-
 -- Orion UI
 local Window = OrionLib:MakeWindow({
 	Name = "GAGSL Hub (v1.2)",
