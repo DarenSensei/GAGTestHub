@@ -1,10 +1,9 @@
--- Main GAGSL Hub Script (CONNECTED & FIXED)
+-- Main GAGSL Hub Script (FIXED & OPTIMIZED)
 repeat task.wait() until game:IsLoaded()
 
+-- Load external functions
 local CoreFunctions = loadstring(game:HttpGet("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/CoreFunctions.lua"))()
-
 local PetFunctions = loadstring(game:HttpGet("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/PetMiddleFunctions.lua"))()
-
 local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/YuraScripts/GrowAFilipinoy/refs/heads/main/TEST.lua"))()
 
 -- Services
@@ -13,7 +12,7 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
--- Pet Control Variables (Initialize from PetFunctions)
+-- Variables initialization
 local selectedPets = {}
 local excludedPets = {}
 local excludedPetESPs = {}
@@ -22,77 +21,114 @@ local autoMiddleEnabled = false
 local currentPetsList = {}
 local petCountLabel = nil
 local petDropdown = nil
+
+-- Sprinkler variables
 local sprinklerTypes = {"Basic Sprinkler", "Advanced Sprinkler", "Master Sprinkler", "Godly Sprinkler", "Honey Sprinkler", "Chocolate Sprinkler"}
 local selectedSprinklers = {}
+
+-- Auto Shovel variables (FIXED)
+local selectedFruitTypes = {}
+local weightThreshold = 50
+local autoShovelEnabled = false
+local autoShovelConnection = nil
 
 -- Auto-buy variables
 local autoBuyEnabled = false
 local buyConnection = nil
 
--- Orion UI
+-- Create Orion UI
 local Window = OrionLib:MakeWindow({
-	Name = "GAGSL Hub (v1.2)",
-	HidePremium = false,
-	IntroText = "Grow A Garden Script Loader",
-	SaveConfig = false
+    Name = "GAGSL Hub (v1.2)",
+    HidePremium = false,
+    IntroText = "Grow A Garden Script Loader",
+    SaveConfig = false
 })
 
--- Wait for intro to finish before showing the main GUI with a transition
+-- Fade in animation
 local function fadeInMainTab()
-	local screenGui = player:WaitForChild("PlayerGui"):WaitForChild("Orion")
-	local mainFrame = screenGui:WaitForChild("Main")
-	mainFrame.BackgroundTransparency = 1
+    local screenGui = player:WaitForChild("PlayerGui"):WaitForChild("Orion")
+    local mainFrame = screenGui:WaitForChild("Main")
+    mainFrame.BackgroundTransparency = 1
 
-	local tween = TweenService:Create(
-		mainFrame,
-		TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{ BackgroundTransparency = 0.2 }
-	)
-	tween:Play()
+    local tween = TweenService:Create(
+        mainFrame,
+        TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { BackgroundTransparency = 0.2 }
+    )
+    tween:Play()
 end
 
 task.delay(1.5, fadeInMainTab)
 
--- Helper functions for sprinklers
+-- FIXED: Sprinkler helper functions using CoreFunctions
 local function getSprinklerTypes()
-    return sprinklerTypes
+    return CoreFunctions.getSprinklerTypes()
 end
 
 local function setSelectedSprinklers(selected)
     selectedSprinklers = selected
+    CoreFunctions.setSelectedSprinklers(selected)
 end
 
 local function getSelectedSprinklers()
-    return selectedSprinklers
+    return CoreFunctions.getSelectedSprinklers()
 end
 
 local function clearSelectedSprinklers()
     selectedSprinklers = {}
+    CoreFunctions.clearSelectedSprinklers()
 end
 
 local function addSprinklerToSelection(sprinklerName)
-    for i, sprinkler in ipairs(selectedSprinklers) do
-        if sprinkler == sprinklerName then
-            return false
-        end
+    local success = CoreFunctions.addSprinklerToSelection(sprinklerName)
+    if success then
+        table.insert(selectedSprinklers, sprinklerName)
     end
-    table.insert(selectedSprinklers, sprinklerName)
-    return true
+    return success
 end
 
 local function getSelectedSprinklersCount()
-    return #selectedSprinklers
+    return CoreFunctions.getSelectedSprinklersCount()
 end
 
 local function getSelectedSprinklersString()
-    if #selectedSprinklers == 0 then
+    return CoreFunctions.getSelectedSprinklersString()
+end
+
+-- FIXED: Auto Shovel helper functions using CoreFunctions
+local function getFruitTypes()
+    return CoreFunctions.getFruitTypes()
+end
+
+local function clearSelectedFruits()
+    selectedFruitTypes = {}
+    CoreFunctions.clearSelectedFruits()
+end
+
+local function addFruitToSelection(fruitName)
+    if not table.find(selectedFruitTypes, fruitName) then
+        table.insert(selectedFruitTypes, fruitName)
+        CoreFunctions.addFruitToSelection(fruitName)
+    end
+end
+
+local function getSelectedFruitsCount()
+    return #selectedFruitTypes
+end
+
+local function getSelectedFruitsString()
+    if #selectedFruitTypes == 0 then
         return "None"
     end
-    local selectionText = table.concat(selectedSprinklers, ", ")
+    local selectionText = table.concat(selectedFruitTypes, ", ")
     return #selectionText > 50 and (selectionText:sub(1, 47) .. "...") or selectionText
 end
 
--- Helper functions for pets
+local function autoShovel()
+    CoreFunctions.autoShovel()
+end
+
+-- Pet helper functions
 local function refreshPets()
     return PetFunctions.refreshPets()
 end
@@ -132,11 +168,11 @@ end
 
 local function cleanup()
     PetFunctions.cleanup()
+    CoreFunctions.cleanup()
     if buyConnection then
         buyConnection:Disconnect()
         buyConnection = nil
     end
-    -- Clean up auto shovel connection
     if autoShovelConnection then
         autoShovelConnection:Disconnect()
         autoShovelConnection = nil
@@ -155,108 +191,88 @@ local function removeFarms()
     CoreFunctions.removeFarms(OrionLib)
 end
 
--- New Tab: Tools
+-- MAIN TAB
 local ToolsTab = Window:MakeTab({
-	Name = "Main",
-	Icon = "rbxassetid://6031280882",
-	PremiumOnly = false
+    Name = "Main",
+    Icon = "rbxassetid://6031280882",
+    PremiumOnly = false
 })
 
--- Display Server Version
+-- Server info
 ToolsTab:AddParagraph("Server Version🌐", tostring(game.PrivateServerId ~= "" and "Private Server" or game.PlaceVersion))
 
--- Input JobID
+-- Job ID input
 ToolsTab:AddTextbox({
-	Name = "Join Job ID",
-	Default = "",
-	TextDisappear = true,
-	PlaceholderText = "Paste Job ID & press Enter",
-	Callback = function(jobId)
-		if jobId and jobId ~= "" then
-			game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, jobId, player)
-		end
-	end
+    Name = "Join Job ID",
+    Default = "",
+    TextDisappear = true,
+    PlaceholderText = "Paste Job ID & press Enter",
+    Callback = function(jobId)
+        if jobId and jobId ~= "" then
+            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, jobId, player)
+        end
+    end
 })
 
--- Copy Current Job ID Button
+-- Copy Job ID
 ToolsTab:AddButton({
-	Name = "Copy Current Job ID",
-	Callback = function()
-		if setclipboard then
-			local jobId = game.JobId
-			setclipboard(jobId)
-			OrionLib:MakeNotification({
-				Name = "Copied!",
-				Content = "Current Job ID copied to clipboard.",
-				Time = 3
-			})
-		else
-			warn("Clipboard access not available.")
-		end
-	end
+    Name = "Copy Current Job ID",
+    Callback = function()
+        if setclipboard then
+            setclipboard(game.JobId)
+            OrionLib:MakeNotification({
+                Name = "Copied!",
+                Content = "Current Job ID copied to clipboard.",
+                Time = 3
+            })
+        else
+            warn("Clipboard access not available.")
+        end
+    end
 })
 
--- Rejoin Current Server
+-- Rejoin server
 ToolsTab:AddButton({
-	Name = "Rejoin Server",
-	Callback = function()
-		game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
-	end
+    Name = "Rejoin Server",
+    Callback = function()
+        game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+    end
 })
 
--- Server Hop
+-- Server hop
 ToolsTab:AddButton({
-	Name = "Server Hop",
-	Callback = function()
-		local HttpService = game:GetService("HttpService")
-		local TeleportService = game:GetService("TeleportService")
-
-		local function getServers()
-			local success, result = pcall(function()
-				return game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")
-			end)
-			if success then
-				local decoded = HttpService:JSONDecode(result)
-				if decoded and decoded.data then
-					for _, server in ipairs(decoded.data) do
-						if server.playing < server.maxPlayers and server.id ~= game.JobId then
-							return server.id, server.playing
-						end
-					end
-				end
-			end
-			return nil
-		end
-
-		local foundServer, playerCount = getServers()
-		if foundServer then
-			OrionLib:MakeNotification({
-				Name = "Server Found",
-				Content = "Found server with " .. tostring(playerCount) .. " players.",
-				Time = 3
-			})
-			task.wait(3)
-			TeleportService:TeleportToPlaceInstance(game.PlaceId, foundServer, player)
-		else
-			OrionLib:MakeNotification({
-				Name = "No Servers",
-				Content = "Couldn't find a suitable server.",
-				Time = 3
-			})
-		end
-	end
+    Name = "Server Hop",
+    Callback = function()
+        local foundServer, playerCount = CoreFunctions.serverHop()
+        if foundServer then
+            OrionLib:MakeNotification({
+                Name = "Server Found",
+                Content = "Found server with " .. tostring(playerCount) .. " players.",
+                Time = 3
+            })
+            task.wait(3)
+            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, foundServer, player)
+        else
+            OrionLib:MakeNotification({
+                Name = "No Servers",
+                Content = "Couldn't find a suitable server.",
+                Time = 3
+            })
+        end
+    end
 })
 
+-- FARM TAB
 local Tab = Window:MakeTab({
-	Name = "Farm",
-	Icon = "rbxassetid://6031280882",
-	PremiumOnly = false
+    Name = "Farm",
+    Icon = "rbxassetid://6031280882",
+    PremiumOnly = false
 })
 
 -- Sprinkler Section
-Tab:AddParagraph("Shovel Sprikler", "Inf. Sprinkler Glitch")
+Tab:AddParagraph("Shovel Sprinkler", "Inf. Sprinkler Glitch")
 
--- Create sprinkler UI manually (since the function doesn't exist in CoreFunctions)
+-- Sprinkler dropdown
 local sprinklerDropdown = Tab:AddDropdown({
     Name = "Select Sprinkler to Delete",
     Default = {},
@@ -268,12 +284,9 @@ local sprinklerDropdown = Tab:AddDropdown({
         return options
     end)(),
     Callback = function(selectedValues)
-        -- Clear all previous selections
         clearSelectedSprinklers()
         
-        -- Handle the selected values (array of sprinkler names)
         if selectedValues and #selectedValues > 0 then
-            -- Check if "None" is selected
             local hasNone = false
             for _, value in pairs(selectedValues) do
                 if value == "None" then
@@ -283,12 +296,10 @@ local sprinklerDropdown = Tab:AddDropdown({
             end
             
             if not hasNone then
-                -- Add all selected sprinklers to selection
                 for _, sprinklerName in pairs(selectedValues) do
                     addSprinklerToSelection(sprinklerName)
                 end
                 
-                -- Show notification of selection
                 OrionLib:MakeNotification({
                     Name = "Selection Updated",
                     Content = string.format("Selected (%d): %s", 
@@ -303,27 +314,17 @@ local sprinklerDropdown = Tab:AddDropdown({
                     Time = 2
                 })
             end
-        else
-            OrionLib:MakeNotification({
-                Name = "Selection Cleared",
-                Content = "No sprinklers selected",
-                Time = 2
-            })
         end
     end
 })
 
--- Select All Toggle
+-- Select all sprinklers toggle
 Tab:AddToggle({
     Name = "Select All Sprinkler",
     Default = false,
     Callback = function(Value)
         if Value then
-            -- Create a copy of all sprinkler types
-            local allSprinklers = {}
-            for _, sprinklerType in ipairs(getSprinklerTypes()) do
-                table.insert(allSprinklers, sprinklerType)
-            end
+            local allSprinklers = getSprinklerTypes()
             setSelectedSprinklers(allSprinklers)
             
             OrionLib:MakeNotification({
@@ -342,7 +343,7 @@ Tab:AddToggle({
     end
 })
 
--- Delete Button
+-- Delete sprinkler button
 Tab:AddButton({
     Name = "Delete Sprinkler",
     Callback = function()
@@ -361,20 +362,13 @@ Tab:AddButton({
     end
 })
 
--- Pet Control Section
+-- Pet Section
 Tab:AddParagraph("Pet Exploit", "Auto Middle Pets, Select Pet to Exclude.")
 
--- Get initial pets
-local initialPets = refreshPets()
-
 petCountLabel = Tab:AddLabel("Pets Found: 0 | Selected: 0 | Excluded: 0")
-
--- Set the label in PetFunctions
 PetFunctions.setPetCountLabel(petCountLabel)
 
--- Update pet count initially and periodically
 updatePetCount()
-
 task.spawn(function()
     while true do
         updatePetCount()
@@ -382,25 +376,21 @@ task.spawn(function()
     end
 end)
 
--- Pet Exclusion Dropdown
+-- Pet exclusion dropdown
 petDropdown = Tab:AddDropdown({
     Name = "Select Pets to Exclude",
-    Default = {}, -- Start with no exclusions
+    Default = {},
     Options = {"None"},
     Callback = function(selectedValues)
-        -- Get current pets and excluded pets from PetFunctions
         excludedPets = PetFunctions.getExcludedPets()
         currentPetsList = PetFunctions.getCurrentPetsList()
         
-        -- Clear all previous exclusions
         for petId, _ in pairs(excludedPets) do
             removeESPMarker(petId)
         end
         excludedPets = {}
         
-        -- Handle the selected values (array of pet names)
         if selectedValues and #selectedValues > 0 then
-            -- Check if "None" is selected or if array is empty
             local hasNone = false
             for _, value in pairs(selectedValues) do
                 if value == "None" then
@@ -410,7 +400,6 @@ petDropdown = Tab:AddDropdown({
             end
             
             if not hasNone then
-                -- Add all selected pets to exclusions
                 for _, petName in pairs(selectedValues) do
                     local selectedPet = currentPetsList[petName]
                     if selectedPet then
@@ -421,11 +410,9 @@ petDropdown = Tab:AddDropdown({
             end
         end
         
-        -- Update excluded pets in PetFunctions
         PetFunctions.setExcludedPets(excludedPets)
         updatePetCount()
         
-        -- Show notification about exclusions
         local excludedCount = 0
         for _ in pairs(excludedPets) do
             excludedCount = excludedCount + 1
@@ -435,28 +422,22 @@ petDropdown = Tab:AddDropdown({
             OrionLib:MakeNotification({
                 Name = "Pets Excluded",
                 Content = "Excluded " .. excludedCount .. " pets from auto middle.",
-                Image = "rbxassetid://4483345998",
                 Time = 2
             })
         end
     end
 })
 
--- Set the dropdown in PetFunctions
 PetFunctions.setPetDropdown(petDropdown)
 
--- Combined Refresh and Auto Select All Button
+-- Refresh and select all pets
 Tab:AddButton({
     Name = "Refresh & Auto Select All Pets",
     Callback = function()
-        -- Refresh pets
         local newPets = refreshPets()
-        
-        -- Auto select all pets (this will also clear exclusions via the dropdown callback)
         selectAllPets()
         updatePetCount()
         
-        -- Clear the exclusion dropdown when selecting all pets
         if petDropdown then
             petDropdown:ClearAll()
         end
@@ -464,13 +445,12 @@ Tab:AddButton({
         OrionLib:MakeNotification({
             Name = "Pets Refreshed & Selected",
             Content = "Found " .. #newPets .. " pets and selected all for auto middle.",
-            Image = "rbxassetid://4483345998",
             Time = 3
         })
     end
 })
 
--- Auto Middle Toggle
+-- Auto middle toggle
 Tab:AddToggle({
     Name = "Auto Middle Pets",
     Default = false,
@@ -486,9 +466,10 @@ Tab:AddToggle({
     end
 })
 
+-- Auto Shovel Section
 Tab:AddParagraph("Auto Shovel", "Automatically shovel fruits based on weight threshold.")
 
--- FIXED: Fruit Selection Dropdown
+-- Fruit selection dropdown
 local fruitDropdown = Tab:AddDropdown({
     Name = "Select Fruits to Shovel",
     Default = {},
@@ -501,12 +482,9 @@ local fruitDropdown = Tab:AddDropdown({
         return options
     end)(),
     Callback = function(selectedValues)
-        -- Clear all previous selections
         clearSelectedFruits()
 
-        -- Handle the selected values (array of fruit names)
         if selectedValues and #selectedValues > 0 then
-            -- Check if "None" is selected
             local hasNone = false
             for _, value in pairs(selectedValues) do
                 if value == "None" then
@@ -516,12 +494,10 @@ local fruitDropdown = Tab:AddDropdown({
             end
 
             if not hasNone then
-                -- Add all selected fruits to selection
                 for _, fruitName in pairs(selectedValues) do
                     addFruitToSelection(fruitName)
                 end
 
-                -- Show notification of selection
                 OrionLib:MakeNotification({
                     Name = "Fruits Selected",
                     Content = string.format("Selected (%d): %s", 
@@ -536,25 +512,19 @@ local fruitDropdown = Tab:AddDropdown({
                     Time = 2
                 })
             end
-        else
-            OrionLib:MakeNotification({
-                Name = "Selection Cleared",
-                Content = "No fruits selected",
-                Time = 2
-            })
         end
     end
 })
 
--- FIXED: Weight Threshold Input
+-- Weight threshold input
 Tab:AddTextbox({
     Name = "Weight Threshold (KG)",
     Default = "30",
     TextDisappear = false,
     Callback = function(value)
-        local num = tonumber(value)
-        if num and num >= 0 and num <= 500 then
-            weightThreshold = num
+        local success = CoreFunctions.setFruitWeightThreshold(value)
+        if success then
+            weightThreshold = tonumber(value)
             OrionLib:MakeNotification({
                 Name = "Weight Updated",
                 Content = "Weight threshold set to " .. value .. " KG",
@@ -570,17 +540,11 @@ Tab:AddTextbox({
     end
 })
 
--- FIXED: Refresh Fruit List Button
+-- Refresh fruit list
 Tab:AddButton({
     Name = "Refresh Fruit List",
     Callback = function()
-        local options = {"None"}
-        local fruitTypes = getFruitTypes()
-        for _, fruitType in ipairs(fruitTypes) do
-            table.insert(options, fruitType)
-        end
-
-        -- Update the dropdown with new options
+        local options = CoreFunctions.refreshFruitList()
         fruitDropdown:Refresh(options, true)
 
         OrionLib:MakeNotification({
@@ -591,103 +555,52 @@ Tab:AddButton({
     end
 })
 
+-- Auto shovel toggle
 Tab:AddToggle({
     Name = "Auto Shovel",
     Default = false,
     Callback = function(value)
-        autoShovelEnabled = value
-        
-        if value then
-            if autoShovelConnection then autoShovelConnection:Disconnect() end
-            autoShovelConnection = RunService.Heartbeat:Connect(function()
-                if autoShovelEnabled then
-                    autoShovel()
-                    task.wait(2) -- Increased wait time to reduce spam
-                end
-            end)
-            
-            OrionLib:MakeNotification({
-                Name = "Auto Shovel Enabled",
-                Content = "Shoveling fruits with weight < " .. weightThreshold .. " KG",
-                Time = 2
-            })
-        else
-            if autoShovelConnection then
-                autoShovelConnection:Disconnect()
-                autoShovelConnection = nil
-            end
-            
-            OrionLib:MakeNotification({
-                Name = "Auto Shovel Disabled",
-                Content = "Stopped auto shoveling",
-                Time = 2
-            })
-        end
+        CoreFunctions.toggleAutoShovel(value, OrionLib)
     end
 })
 
+-- SHOP TAB
 local ShopTab = Window:MakeTab({
     Name = "Shop",
     Icon = "rbxassetid://4835310745",
     PremiumOnly = false
 })
 
--- Add Toggle
+-- Auto buy zen
 ShopTab:AddToggle({
     Name = "Auto Buy Zen",
     Default = false,
     Callback = function(Value)
-        autoBuyEnabled = Value
+        CoreFunctions.toggleAutoBuyZen(Value)
         
-        if autoBuyEnabled then
-            -- Start auto buying
-            buyConnection = RunService.Heartbeat:Connect(function()
-                buyAllZenItems()
-                task.wait(0.1) -- Small delay to prevent spam
-            end)
-            
+        if Value then
             OrionLib:MakeNotification({
                 Name = "Auto Buy Zen",
                 Content = "Auto Buy Zen enabled!",
-                Image = "rbxassetid://4483345998",
                 Time = 2
             })
-        else
-            -- Stop auto buying
-            if buyConnection then
-                buyConnection:Disconnect()
-                buyConnection = nil
-            end
         end
     end    
 })
 
+-- Auto buy merchant
 ShopTab:AddToggle({
     Name = "Auto Buy Traveling Merchants",
     Default = false,
     Callback = function(Value)
-        autoBuyEnabled = Value
+        CoreFunctions.toggleAutoBuyMerchant(Value)
         
-        if autoBuyEnabled then
-            -- Start auto buying
-            buyConnection = RunService.Heartbeat:Connect(function()
-                buyAllMerchantItems()
-                task.wait(0.1) -- Small delay to prevent spam
-            end)
-
+        if Value then
             OrionLib:MakeNotification({
                 Name = "Auto Buy Traveling Merchant",
                 Content = "Auto Buy Traveling Merchant enabled!",
-                Image = "rbxassetid://4483345998",
                 Time = 2
             })
-
-        else
-            -- Stop auto buying
-            if buyConnection then
-                buyConnection:Disconnect()
-                buyConnection = nil
-            end
         end
     end    
 })
@@ -695,71 +608,67 @@ ShopTab:AddToggle({
 ShopTab:AddParagraph("AUTO BUY GEARS", "COMING SOON...")
 ShopTab:AddParagraph("AUTO BUY SEEDS", "COMING SOON...")
 
--- Misc Tab
+-- MISC TAB
 local MiscTab = Window:MakeTab({
-	Name = "Misc",
-	Icon = "rbxassetid://6031280882",
-	PremiumOnly = false
+    Name = "Misc",
+    Icon = "rbxassetid://6031280882",
+    PremiumOnly = false
 })
 
--- Lag Reduction Section
 MiscTab:AddParagraph("Performance", "Reduce game lag by removing lag-causing objects.")
 
--- New Reduce Lag Button
+-- Reduce lag
 MiscTab:AddButton({
-	Name = "Reduce Lag",
-	Callback = function()
-		repeat
-			local lag = game.Workspace:findFirstChild("Lag", true)
-			if (lag ~= nil) then
-				lag:remove()
-			end
-			wait()
-		until (game.Workspace:findFirstChild("Lag", true) == nil)
-		
-		OrionLib:MakeNotification({
-			Name = "Lag Reduced",
-			Content = "All lag objects have been removed.",
-			Time = 3
-		})
-	end
+    Name = "Reduce Lag",
+    Callback = function()
+        repeat
+            local lag = game.Workspace:findFirstChild("Lag", true)
+            if (lag ~= nil) then
+                lag:remove()
+            end
+            wait()
+        until (game.Workspace:findFirstChild("Lag", true) == nil)
+        
+        OrionLib:MakeNotification({
+            Name = "Lag Reduced",
+            Content = "All lag objects have been removed.",
+            Time = 3
+        })
+    end
 })
 
--- NEW: Remove Farms Button
+-- Remove farms
 MiscTab:AddButton({
-	Name = "Remove Farms (Stay close to your farm)",
-	Callback = function()
-		removeFarms()
-	end
+    Name = "Remove Farms (Stay close to your farm)",
+    Callback = function()
+        removeFarms()
+    end
 })
 
--- Social Tab
+-- SOCIAL TAB
 local SocialTab = Window:MakeTab({
-	Name = "Social",
-	Icon = "rbxassetid://6031075938", -- You can change this icon
-	PremiumOnly = false
+    Name = "Social",
+    Icon = "rbxassetid://6031075938",
+    PremiumOnly = false
 })
 
--- TikTok Section
 SocialTab:AddParagraph("TIKTOK", "@yurahaxyz        |        @yurahayz")
-
--- YouTube Section
 SocialTab:AddParagraph("YOUTUBE", "YUraxYZ")
 
--- Discord Button
+-- Discord button
 SocialTab:AddButton({
-	Name = "Yura Community Discord",
-	Callback = function()
-		setclipboard("https://discord.gg/gpR7YQjnFt")
-		OrionLib:MakeNotification({
-			Name = "Copied!",
-			Content = "Discord invite copied to clipboard.",
-			Time = 3
-		})
-	end
+    Name = "Yura Community Discord",
+    Callback = function()
+        setclipboard("https://discord.gg/gpR7YQjnFt")
+        OrionLib:MakeNotification({
+            Name = "Copied!",
+            Content = "Discord invite copied to clipboard.",
+            Time = 3
+        })
+    end
 })
 
--- Cleanup on script end
+-- Cleanup on exit
 Players.PlayerRemoving:Connect(function(player)
     if player == Players.LocalPlayer then
         cleanup()
@@ -770,4 +679,5 @@ end)
 OrionLib:MakeNotification({
     Name = "GAGSL Hub Loaded",
     Content = "GAGSL Hub loaded with +999 Pogi Points!",
+    Time = 4
 })
