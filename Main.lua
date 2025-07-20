@@ -469,21 +469,21 @@ Tab:AddToggle({
 -- Auto Shovel Section
 Tab:AddParagraph("Auto Shovel", "Automatically shovel fruits based on weight threshold.")
 
--- Fruit selection dropdown
+
+-- Updated UI code for Auto Shovel functionality
 local fruitDropdown = Tab:AddDropdown({
     Name = "Select Fruits to Shovel",
     Default = {},
     Options = (function()
         local options = {"None"}
-        local fruitTypes = getFruitTypes()
+        local fruitTypes = Functions.getFruitTypes()
         for _, fruitType in ipairs(fruitTypes) do
             table.insert(options, fruitType)
         end
         return options
     end)(),
     Callback = function(selectedValues)
-        clearSelectedFruits()
-
+        Functions.clearSelectedFruits()
         if selectedValues and #selectedValues > 0 then
             local hasNone = false
             for _, value in pairs(selectedValues) do
@@ -492,17 +492,15 @@ local fruitDropdown = Tab:AddDropdown({
                     break
                 end
             end
-
             if not hasNone then
                 for _, fruitName in pairs(selectedValues) do
-                    addFruitToSelection(fruitName)
+                    Functions.addFruitToSelection(fruitName)
                 end
-
                 OrionLib:MakeNotification({
                     Name = "Fruits Selected",
                     Content = string.format("Selected (%d): %s", 
-                        getSelectedFruitsCount(), 
-                        getSelectedFruitsString()),
+                        Functions.getSelectedFruitsCount(), 
+                        Functions.getSelectedFruitsString()),
                     Time = 3
                 })
             else
@@ -522,9 +520,8 @@ Tab:AddTextbox({
     Default = "30",
     TextDisappear = false,
     Callback = function(value)
-        local success = CoreFunctions.setFruitWeightThreshold(value)
+        local success = Functions.setFruitWeightThreshold(value)
         if success then
-            weightThreshold = tonumber(value)
             OrionLib:MakeNotification({
                 Name = "Weight Updated",
                 Content = "Weight threshold set to " .. value .. " KG",
@@ -540,13 +537,12 @@ Tab:AddTextbox({
     end
 })
 
--- Refresh fruit list
+-- Refresh fruit list button
 Tab:AddButton({
     Name = "Refresh Fruit List",
     Callback = function()
-        local options = CoreFunctions.refreshFruitList()
+        local options = Functions.refreshFruitList()
         fruitDropdown:Refresh(options, true)
-
         OrionLib:MakeNotification({
             Name = "List Refreshed",
             Content = "Fruit list updated with " .. (#options - 1) .. " types",
@@ -560,10 +556,9 @@ Tab:AddToggle({
     Name = "Auto Shovel",
     Default = false,
     Callback = function(value)
-        CoreFunctions.toggleAutoShovel(value, OrionLib)
+        Functions.toggleAutoShovel(value, OrionLib)
     end
 })
-
 -- SHOP TAB
 local ShopTab = Window:MakeTab({
     Name = "Shop",
