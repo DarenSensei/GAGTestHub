@@ -79,12 +79,26 @@ local function getRemoteEvent(path)
     return success and result or nil
 end
 
-local BuyEventShopStock = getRemoteEvent("GameEvents") and getRemoteEvent("GameEvents").BuyEventShopStock
-local BuyTravelingMerchantShopStock = getRemoteEvent("GameEvents") and getRemoteEvent("GameEvents").BuyTravelingMerchantShopStock
-local DeleteObject = getRemoteEvent("GameEvents") and getRemoteEvent("GameEvents").DeleteObject
-local RemoveItem = getRemoteEvent("GameEvents") and getRemoteEvent("GameEvents").Remove_Item
-local ActivePetService = getRemoteEvent("GameEvents") and getRemoteEvent("GameEvents").ActivePetService
-local PetZoneAbility = getRemoteEvent("GameEvents") and getRemoteEvent("GameEvents").PetZoneAbility
+-- FIXED: Better remote event initialization with validation
+local BuyEventShopStock = nil
+local BuyTravelingMerchantShopStock = nil
+local DeleteObject = nil
+local RemoveItem = nil
+local ActivePetService = nil
+local PetZoneAbility = nil
+
+-- Initialize remote events safely
+pcall(function()
+    local gameEvents = getRemoteEvent("GameEvents")
+    if gameEvents then
+        BuyEventShopStock = gameEvents:FindFirstChild("BuyEventShopStock")
+        BuyTravelingMerchantShopStock = gameEvents:FindFirstChild("BuyTravelingMerchantShopStock")
+        DeleteObject = gameEvents:FindFirstChild("DeleteObject")
+        RemoveItem = gameEvents:FindFirstChild("Remove_Item")
+        ActivePetService = gameEvents:FindFirstChild("ActivePetService")
+        PetZoneAbility = gameEvents:FindFirstChild("PetZoneAbility")
+    end
+end)
 
 -- Core folders/scripts with error handling
 local shovelClient = nil
@@ -93,18 +107,31 @@ local objectsFolder = nil
 
 -- Initialize core objects safely
 pcall(function()
-    shovelClient = player:WaitForChild("PlayerScripts", 5):WaitForChild("Shovel_Client", 5)
+    if player:FindFirstChild("PlayerScripts") then
+        shovelClient = player.PlayerScripts:WaitForChild("Shovel_Client", 5)
+    end
 end)
 
 pcall(function()
-    shovelPrompt = player:WaitForChild("PlayerGui", 5):WaitForChild("ShovelPrompt", 5)
+    if player:FindFirstChild("PlayerGui") then
+        shovelPrompt = player.PlayerGui:WaitForChild("ShovelPrompt", 5)
+    end
 end)
 
 pcall(function()
-    objectsFolder = Workspace:WaitForChild("Farm", 5):WaitForChild("Farm", 5):WaitForChild("Important", 5):WaitForChild("Objects_Physical", 5)
+    local farm = Workspace:FindFirstChild("Farm")
+    if farm then
+        local farmInner = farm:FindFirstChild("Farm")
+        if farmInner then
+            local important = farmInner:FindFirstChild("Important")
+            if important then
+                objectsFolder = important:FindFirstChild("Objects_Physical")
+            end
+        end
+    end
 end)
 
--- Auto-buy functions with proper connection management
+-- FIXED: Auto-buy functions with proper validation
 function Functions.toggleAutoBuyZen(enabled)
     autoBuyZenEnabled = enabled
     
@@ -143,9 +170,12 @@ function Functions.toggleAutoBuyMerchant(enabled)
     end
 end
 
--- Function to buy all zen items
+-- FIXED: Function to buy all zen items with validation
 function Functions.buyAllZenItems()
-    if not BuyEventShopStock then return end
+    if not BuyEventShopStock then 
+        warn("BuyEventShopStock remote event not found")
+        return 
+    end
     for _, item in pairs(zenItems) do
         pcall(function()
             BuyEventShopStock:FireServer(item)
@@ -153,9 +183,12 @@ function Functions.buyAllZenItems()
     end
 end
 
--- Function to buy all merchant items
+-- FIXED: Function to buy all merchant items with validation
 function Functions.buyAllMerchantItems()
-    if not BuyTravelingMerchantShopStock then return end
+    if not BuyTravelingMerchantShopStock then 
+        warn("BuyTravelingMerchantShopStock remote event not found")
+        return 
+    end
     for _, item in pairs(merchantItems) do
         pcall(function()
             BuyTravelingMerchantShopStock:FireServer(item)
@@ -163,17 +196,28 @@ function Functions.buyAllMerchantItems()
     end
 end
 
--- Equip Shovel function
+-- FIXED: Equip Shovel function with better validation
 function Functions.autoEquipShovel()
-    if not player.Character then return end
+    if not player or not player.Character then 
+        warn("Player or Character not found")
+        return 
+    end
+    
     local backpack = player:FindFirstChild("Backpack")
-    local shovel = backpack and backpack:FindFirstChild(shovelName)
+    if not backpack then
+        warn("Backpack not found")
+        return
+    end
+    
+    local shovel = backpack:FindFirstChild(shovelName)
     if shovel then
         shovel.Parent = player.Character
+    else
+        warn("Shovel not found in backpack: " .. shovelName)
     end
 end
 
--- Sprinklers 
+-- FIXED: Sprinklers function with better error handling
 function Functions.deleteSprinklers(sprinklerArray, OrionLib)
     local targetSprinklers = sprinklerArray or selectedSprinklers
     
@@ -193,22 +237,43 @@ function Functions.deleteSprinklers(sprinklerArray, OrionLib)
     task.wait(0.5)
 
     -- Check if shovelClient and objectsFolder exist
-    if not shovelClient or not objectsFolder then
+    if not shovelClient then
+        warn("ShovelClient not found")
         if OrionLib then
             OrionLib:MakeNotification({
                 Name = "Error",
-                Content = "Required objects not found.",
+                Content = "ShovelClient not found.",
+                Time = 3
+            })
+        end
+        return
+    end
+    
+    if not objectsFolder then
+        warn("ObjectsFolder not found")
+        if OrionLib then
+            OrionLib:MakeNotification({
+                Name = "Error",
+                Content = "Objects folder not found.",
                 Time = 3
             })
         end
         return
     end
 
-    local success, destroyEnv = pcall(function()
-        return getsenv and getsenv(shovelClient) or nil
-    end)
+    -- FIXED: Better getsenv handling
+    local destroyEnv = nil
+    if getsenv then
+        local success, result = pcall(function()
+            return getsenv(shovelClient)
+        end)
+        if success then
+            destroyEnv = result
+        end
+    end
     
-    if not success or not destroyEnv then
+    if not destroyEnv then
+        warn("Could not access shovel environment")
         if OrionLib then
             OrionLib:MakeNotification({
                 Name = "Error",
@@ -318,24 +383,29 @@ function Functions.getSelectedSprinklersString()
     return #selectionText > 50 and (selectionText:sub(1, 47) .. "...") or selectionText
 end
 
+-- FIXED: Auto Shovel helper function
 function Functions.autoShovelEquipShovel()
-    if not player.Character then return end
+    if not player or not player.Character then 
+        warn("Player or Character not found for auto shovel")
+        return 
+    end
+    
     local backpack = player:FindFirstChild("Backpack")
-    local shovel = backpack and backpack:FindFirstChild(shovelName)
+    if not backpack then
+        warn("Backpack not found for auto shovel")
+        return
+    end
+    
+    local shovel = backpack:FindFirstChild(shovelName)
     if shovel then
         shovel.Parent = player.Character
         task.wait(0.1)
+    else
+        warn("Shovel not found for auto shovel: " .. shovelName)
     end
 end
 
--- RECONSTRUCTED AUTO SHOVEL FUNCTIONS
-local RunService = game:GetService("RunService")
-
--- Variables
-local selectedFruitTypes = {}
-local weightThreshold = 30
-local autoShovelEnabled = false
-local autoShovelConnection = nil
+-- RECONSTRUCTED AUTO SHOVEL FUNCTIONS WITH FIXES
 
 -- Helper function to check if fruit should be shoveled
 local function shouldShovelFruit(fruit)
@@ -363,58 +433,37 @@ end
 -- Function to shovel individual fruit (NOT the tree)
 local function shovelFruit(fruit)
     if not fruit or not fruit.Parent then 
-        print("Fruit no longer exists, skipping")
+        warn("Fruit no longer exists, skipping")
         return false
     end
     
-    print("Attempting to shovel fruit: " .. (fruit.Name or "Unknown"))
-    
     -- Auto equip shovel first
-    if Functions.autoEquipShovel then
-        Functions.autoEquipShovel()
-        task.wait(0.1) -- Small delay after equipping
-    end
+    Functions.autoEquipShovel()
+    task.wait(0.1) -- Small delay after equipping
     
     -- Double check fruit still exists after delay
     if not fruit or not fruit.Parent then 
-        print("Fruit disappeared after equipping shovel")
+        warn("Fruit disappeared after equipping shovel")
         return false
     end
     
-    -- Get the Remove_Item event to remove ONLY the individual fruit
-    local success, Remove_Item = pcall(function()
-        return game:GetService("ReplicatedStorage").GameEvents.Remove_Item
-    end)
-    
-    if success and Remove_Item then
-        local removeSuccess = pcall(function()
-            -- IMPORTANT: Only pass the individual fruit object, NOT the tree
-            Remove_Item:FireServer(fruit)
-            print("Successfully sent remove request for fruit: " .. fruit.Name)
-        end)
-        return removeSuccess
-    else
-        print("Could not find Remove_Item event, trying fallback")
-        -- Fallback method
-        local success2, gameEvents = pcall(function()
-            return game:GetService("ReplicatedStorage"):FindFirstChild("GameEvents")
-        end)
-        
-        if success2 and gameEvents then
-            local altEvent = gameEvents:FindFirstChild("Remove_Item")
-            if altEvent then
-                local removeSuccess = pcall(function()
-                    -- Again, only pass the individual fruit
-                    altEvent:FireServer(fruit)
-                    print("Successfully sent remove request via fallback for fruit: " .. fruit.Name)
-                end)
-                return removeSuccess
-            end
-        end
+    -- FIXED: Better RemoveItem validation
+    if not RemoveItem then
+        warn("Remove_Item event not found")
+        return false
     end
     
-    print("Failed to remove fruit: " .. fruit.Name)
-    return false
+    local removeSuccess = pcall(function()
+        RemoveItem:FireServer(fruit)
+    end)
+    
+    if removeSuccess then
+        print("Successfully sent remove request for fruit: " .. fruit.Name)
+    else
+        warn("Failed to remove fruit: " .. fruit.Name)
+    end
+    
+    return removeSuccess
 end
 
 -- Group fruits by name to handle duplicates
@@ -451,7 +500,7 @@ local function isFruitTypeSelected(fruitName)
     return false
 end
 
--- Main auto shovel function
+-- FIXED: Main auto shovel function with better validation
 local function autoShovel()
     if not autoShovelEnabled then 
         return 
@@ -461,88 +510,90 @@ local function autoShovel()
         return
     end
     
-    -- Get the plants physical folder (where all trees/plants are located)
-    local success, plantsPhysical = pcall(function()
-        return workspace.Farm.Farm.Important.Plants_Physical
+    -- FIXED: Better workspace access
+    local plantsPhysical = nil
+    local success = pcall(function()
+        local farm = Workspace:FindFirstChild("Farm")
+        if farm then
+            local farmInner = farm:FindFirstChild("Farm")
+            if farmInner then
+                local important = farmInner:FindFirstChild("Important")
+                if important then
+                    plantsPhysical = important:FindFirstChild("Plants_Physical")
+                end
+            end
+        end
     end)
     
     if not success or not plantsPhysical then 
-        print("Could not access Plants_Physical folder")
+        warn("Could not access Plants_Physical folder")
         return 
     end
     
     -- Get all trees/plants from Plants_Physical
     local allTrees = plantsPhysical:GetChildren()
-    print("Found " .. #allTrees .. " trees/plants to check")
     
     -- Process each tree/plant
     for treeIndex, tree in pairs(allTrees) do
         if tree and tree.Parent then
-            print("Checking tree " .. treeIndex .. ": " .. (tree.Name or "Unknown"))
-            
             -- Look for the Fruits folder inside this tree/plant
             local fruitsFolder = tree:FindFirstChild("Fruits")
             if fruitsFolder then
-                print("Found Fruits folder in tree " .. treeIndex)
-                
                 -- Get all individual fruits from this tree's Fruits folder
                 local allFruitsInTree = fruitsFolder:GetChildren()
-                print("Found " .. #allFruitsInTree .. " fruits in this tree")
                 
                 -- Group fruits by name to handle duplicates properly
                 local groupedFruits = groupFruitsByName(fruitsFolder)
                 
                 -- Process each fruit group
                 for fruitName, fruitGroup in pairs(groupedFruits) do
-                    print("Processing fruit group: " .. fruitName .. " (Count: " .. #fruitGroup .. ")")
-                    
                     -- Check if this fruit type is selected for shoveling
                     if isFruitTypeSelected(fruitName) then
-                        print("Fruit type " .. fruitName .. " is selected for shoveling")
-                        
                         -- Process each individual fruit in the group
                         for fruitIndex, individualFruit in pairs(fruitGroup) do
                             if individualFruit and individualFruit.Parent then
                                 -- Check if this specific fruit meets weight criteria
                                 if shouldShovelFruit(individualFruit) then
-                                    print("Shoveling fruit " .. fruitIndex .. " of type " .. fruitName)
                                     local success = shovelFruit(individualFruit)
                                     if success then
                                         task.wait(0.15) -- Small delay between shoveling each fruit
                                     end
-                                else
-                                    print("Fruit " .. fruitIndex .. " does not meet weight criteria")
                                 end
                             end
                         end
-                    else
-                        print("Fruit type " .. fruitName .. " is not selected for shoveling")
                     end
                 end
-            else
-                print("No Fruits folder found in tree " .. treeIndex)
             end
         end
     end
 end
 
--- Get all available fruit types by checking all trees
+-- FIXED: Get all available fruit types by checking all trees
 function Functions.getFruitTypes()
     local fruitTypes = {}
     
-    -- Access the trees/plants folder
-    local success, plantsPhysical = pcall(function()
-        return workspace.Farm.Farm.Important.Plants_Physical
+    -- FIXED: Better workspace access
+    local plantsPhysical = nil
+    local success = pcall(function()
+        local farm = Workspace:FindFirstChild("Farm")
+        if farm then
+            local farmInner = farm:FindFirstChild("Farm")
+            if farmInner then
+                local important = farmInner:FindFirstChild("Important")
+                if important then
+                    plantsPhysical = important:FindFirstChild("Plants_Physical")
+                end
+            end
+        end
     end)
     
     if not success or not plantsPhysical then 
-        print("Could not access Plants_Physical for getting fruit types")
+        warn("Could not access Plants_Physical for getting fruit types")
         return fruitTypes
     end
     
     -- Get all trees/plants
     local allTrees = plantsPhysical:GetChildren()
-    print("Scanning " .. #allTrees .. " trees for fruit types")
     
     -- Collect unique fruit names from all trees
     local uniqueFruits = {}
@@ -556,7 +607,6 @@ function Functions.getFruitTypes()
                 if fruit:FindFirstChild("Weight") and not uniqueFruits[fruit.Name] then
                     uniqueFruits[fruit.Name] = true
                     table.insert(fruitTypes, fruit.Name)
-                    print("Found fruit type: " .. fruit.Name .. " in tree " .. treeIndex)
                 end
             end
         end
@@ -564,7 +614,6 @@ function Functions.getFruitTypes()
     
     -- Sort alphabetically for better organization
     table.sort(fruitTypes)
-    print("Total unique fruit types found: " .. #fruitTypes)
     return fruitTypes
 end
 
@@ -623,7 +672,7 @@ function Functions.getSelectedFruitsString()
     return table.concat(selectedFruitTypes, ", ")
 end
 
--- Toggle auto shovel
+-- FIXED: Toggle auto shovel with better error handling
 function Functions.toggleAutoShovel(enabled, OrionLib)
     autoShovelEnabled = enabled
     
@@ -670,30 +719,11 @@ end
 -- Export the main auto shovel function
 Functions.autoShovel = autoShovel
 
--- Export variables for external access
-Functions.selectedFruitTypes = selectedFruitTypes
-Functions.weightThreshold = weightThreshold
-Functions.autoShovelEnabled = autoShovelEnabled
-        
-        if OrionLib then
-            OrionLib:MakeNotification({
-                Name = "Auto Shovel",
-                Content = "Auto Shovel disabled",
-                Time = 2
-            })
-        end
-    end
-end
-
--- Export auto shovel variables
-Functions.selectedFruitTypes = selectedFruitTypes
-Functions.weightThreshold = weightThreshold
-Functions.autoShovelEnabled = autoShovelEnabled
-
--- Remove Farms function
+-- FIXED: Remove Farms function with better validation
 function Functions.removeFarms(OrionLib)
     local farmFolder = Workspace:FindFirstChild("Farm")
     if not farmFolder then
+        warn("Farm folder not found in Workspace")
         if OrionLib then
             OrionLib:MakeNotification({
                 Name = "No Farms Found",
@@ -707,6 +737,7 @@ function Functions.removeFarms(OrionLib)
     local playerCharacter = player.Character
     local rootPart = playerCharacter and playerCharacter:FindFirstChild("HumanoidRootPart")
     if not rootPart then
+        warn("Player character or HumanoidRootPart not found")
         if OrionLib then
             OrionLib:MakeNotification({
                 Name = "Player Not Found",
@@ -750,9 +781,14 @@ function Functions.removeFarms(OrionLib)
     end
 end
 
--- Server hopping function
+-- FIXED: Server hopping function with better HttpService validation
 function Functions.serverHop()
     local function getServers()
+        if not game:HttpGet then
+            warn("HttpGet not available")
+            return nil
+        end
+        
         local success, result = pcall(function()
             return game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")
         end)
@@ -779,7 +815,7 @@ function Functions.serverHop()
     end
 end
 
--- Function to copy Discord link
+-- FIXED: Function to copy Discord link with validation
 function Functions.copyDiscordLink()
     pcall(function()
         if setclipboard then
@@ -792,7 +828,7 @@ function Functions.copyDiscordLink()
                 })
             end
         else
-            warn("Clipboard access not available.")
+            warn("Clipboard access not available (setclipboard function not found)")
         end
     end)
 end
@@ -835,5 +871,8 @@ Functions.excludedPets = excludedPets
 Functions.excludedPetESPs = excludedPetESPs
 Functions.allPetsSelected = allPetsSelected
 Functions.currentPetsList = currentPetsList
+Functions.selectedFruitTypes = selectedFruitTypes
+Functions.weightThreshold = weightThreshold
+Functions.autoShovelEnabled = autoShovelEnabled
 
 return Functions
