@@ -483,38 +483,6 @@ Tab:AddToggle({
 
 Tab:AddParagraph("Auto Shovel", "Automatically shovel fruits based on weight threshold.")
 
--- Auto Shovel Variables
-local selectedFruitTypes = {}
-local weightThreshold = 30
-local autoShovelEnabled = false
-
--- Helper functions for auto shovel
-local function getFruitTypes()
-    return CoreFunctions.getFruitTypes()
-end
-
-local function clearSelectedFruits()
-    selectedFruitTypes = {}
-end
-
-local function addFruitToSelection(fruitName)
-    if not table.find(selectedFruitTypes, fruitName) then
-        table.insert(selectedFruitTypes, fruitName)
-    end
-end
-
-local function getSelectedFruitsCount()
-    return #selectedFruitTypes
-end
-
-local function getSelectedFruitsString()
-    if #selectedFruitTypes == 0 then
-        return "None"
-    end
-    local selectionText = table.concat(selectedFruitTypes, ", ")
-    return #selectionText > 50 and (selectionText:sub(1, 47) .. "...") or selectionText
-end
-
 -- Fruit Selection Dropdown
 local fruitDropdown = Tab:AddDropdown({
     Name = "Select Fruits to Shovel",
@@ -530,7 +498,7 @@ local fruitDropdown = Tab:AddDropdown({
     Callback = function(selectedValues)
         -- Clear all previous selections
         clearSelectedFruits()
-        
+
         -- Handle the selected values (array of fruit names)
         if selectedValues and #selectedValues > 0 then
             -- Check if "None" is selected
@@ -541,16 +509,16 @@ local fruitDropdown = Tab:AddDropdown({
                     break
                 end
             end
-            
+
             if not hasNone then
                 -- Add all selected fruits to selection
                 for _, fruitName in pairs(selectedValues) do
                     addFruitToSelection(fruitName)
                 end
-                
+
                 -- Update selection in CoreFunctions
                 CoreFunctions.setSelectedFruits(selectedFruitTypes)
-                
+
                 -- Show notification of selection
                 OrionLib:MakeNotification({
                     Name = "Fruits Selected",
@@ -562,7 +530,7 @@ local fruitDropdown = Tab:AddDropdown({
             else
                 -- Clear selection in CoreFunctions
                 CoreFunctions.setSelectedFruits({})
-                
+
                 OrionLib:MakeNotification({
                     Name = "Selection Cleared",
                     Content = "No fruits selected",
@@ -572,7 +540,7 @@ local fruitDropdown = Tab:AddDropdown({
         else
             -- Clear selection in CoreFunctions
             CoreFunctions.setSelectedFruits({})
-            
+
             OrionLib:MakeNotification({
                 Name = "Selection Cleared",
                 Content = "No fruits selected",
@@ -581,7 +549,6 @@ local fruitDropdown = Tab:AddDropdown({
         end
     end
 })
-
 -- Weight Threshold Input
 Tab:AddTextbox({
     Name = "Weight Threshold (KG)",
@@ -605,21 +572,29 @@ Tab:AddTextbox({
         end
     end
 })
-
 -- Refresh Fruit List Button
 Tab:AddButton({
     Name = "Refresh Fruit List",
     Callback = function()
         local newOptions = CoreFunctions.refreshFruitList()
-        
+
         -- Update the dropdown with new options
         fruitDropdown:Refresh(newOptions, true)
-        
+
         OrionLib:MakeNotification({
             Name = "List Refreshed",
             Content = "Fruit list updated with " .. (#newOptions - 1) .. " types",
             Time = 2
         })
+    end
+})
+-- Auto Shovel Toggle
+Tab:AddToggle({
+    Name = "Auto Shovel",
+    Default = false,
+    Callback = function(value)
+        autoShovelEnabled = value
+        CoreFunctions.toggleAutoShovel(value, OrionLib)
     end
 })
 
@@ -630,6 +605,20 @@ Tab:AddToggle({
     Callback = function(value)
         autoShovelEnabled = value
         CoreFunctions.toggleAutoShovel(value, OrionLib)
+        
+        if value then
+            OrionLib:MakeNotification({
+                Name = "Auto Shovel Enabled",
+                Content = "Shoveling fruits with weight < " .. (weightThreshold or 30) .. " KG",
+                Time = 2
+            })
+        else
+            OrionLib:MakeNotification({
+                Name = "Auto Shovel Disabled",
+                Content = "Stopped auto shoveling",
+                Time = 2
+            })
+        end
     end
 })
 
