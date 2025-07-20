@@ -1,7 +1,7 @@
 -- Main GAGSL Hub Script (FIXED)
 repeat task.wait() until game:IsLoaded()
 
-local CoreFunctions = loadstring(game:HttpGet("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/CoreFunctions.lua"))()
+local CoreFunctions = loadstring(game:HttpGet("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/CoreFunctions.lua"))()
 
 local PetFunctions = loadstring(game:HttpGet("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/PetMiddleFunctions.lua"))()
 
