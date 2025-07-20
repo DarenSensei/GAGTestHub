@@ -1,4 +1,4 @@
--- Main GAGSL Hub Script (FIXED)
+-- Main GAGSL Hub Script (CONNECTED & FIXED)
 repeat task.wait() until game:IsLoaded()
 
 local CoreFunctions = loadstring(game:HttpGet("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/CoreFunctions.lua"))()
@@ -28,6 +28,58 @@ local selectedSprinklers = {}
 -- Auto-buy variables
 local autoBuyEnabled = false
 local buyConnection = nil
+
+-- AUTO SHOVEL VARIABLES (Added from Script 2)
+local selectedFruitTypes = {}
+local weightThreshold = 30
+local autoShovelEnabled = false
+local autoShovelConnection = nil
+
+-- AUTO SHOVEL HELPER FUNCTIONS (Added from Script 2)
+local function getFruitTypes()
+    -- Get all unique fruit types from the game
+    local fruitTypes = {}
+    local success, plantsPhysical = pcall(function()
+        return workspace.Farm.Farm.Important.Plants_Physical
+    end)
+    
+    if success and plantsPhysical then
+        for _, plant in pairs(plantsPhysical:GetChildren()) do
+            if plant:FindFirstChild("Fruits") then
+                for _, fruit in pairs(plant.Fruits:GetChildren()) do
+                    local fruitName = fruit.Name
+                    if not table.find(fruitTypes, fruitName) then
+                        table.insert(fruitTypes, fruitName)
+                    end
+                end
+            end
+        end
+    end
+    
+    return fruitTypes
+end
+
+local function clearSelectedFruits()
+    selectedFruitTypes = {}
+end
+
+local function addFruitToSelection(fruitName)
+    if not table.find(selectedFruitTypes, fruitName) then
+        table.insert(selectedFruitTypes, fruitName)
+    end
+end
+
+local function getSelectedFruitsCount()
+    return #selectedFruitTypes
+end
+
+local function getSelectedFruitsString()
+    if #selectedFruitTypes == 0 then
+        return "None"
+    end
+    local selectionText = table.concat(selectedFruitTypes, ", ")
+    return #selectionText > 50 and (selectionText:sub(1, 47) .. "...") or selectionText
+end
 
 -- Orion UI
 local Window = OrionLib:MakeWindow({
@@ -135,6 +187,11 @@ local function cleanup()
     if buyConnection then
         buyConnection:Disconnect()
         buyConnection = nil
+    end
+    -- Clean up auto shovel connection
+    if autoShovelConnection then
+        autoShovelConnection:Disconnect()
+        autoShovelConnection = nil
     end
 end
 
@@ -483,59 +540,142 @@ Tab:AddToggle({
 
 Tab:AddParagraph("Auto Shovel", "Automatically shovel fruits based on weight threshold.")
 
--- FIXED AUTO SHOVEL FUNCTIONS
+-- FIXED: Fruit Selection Dropdown
+local fruitDropdown = Tab:AddDropdown({
+    Name = "Select Fruits to Shovel",
+    Default = {},
+    Options = (function()
+        local options = {"None"}
+        local fruitTypes = getFruitTypes()
+        for _, fruitType in ipairs(fruitTypes) do
+            table.insert(options, fruitType)
+        end
+        return options
+    end)(),
+    Callback = function(selectedValues)
+        -- Clear all previous selections
+        clearSelectedFruits()
+
+        -- Handle the selected values (array of fruit names)
+        if selectedValues and #selectedValues > 0 then
+            -- Check if "None" is selected
+            local hasNone = false
+            for _, value in pairs(selectedValues) do
+                if value == "None" then
+                    hasNone = true
+                    break
+                end
+            end
+
+            if not hasNone then
+                -- Add all selected fruits to selection
+                for _, fruitName in pairs(selectedValues) do
+                    addFruitToSelection(fruitName)
+                end
+
+                -- Show notification of selection
+                OrionLib:MakeNotification({
+                    Name = "Fruits Selected",
+                    Content = string.format("Selected (%d): %s", 
+                        getSelectedFruitsCount(), 
+                        getSelectedFruitsString()),
+                    Time = 3
+                })
+            else
+                OrionLib:MakeNotification({
+                    Name = "Selection Cleared",
+                    Content = "No fruits selected",
+                    Time = 2
+                })
+            end
+        else
+            OrionLib:MakeNotification({
+                Name = "Selection Cleared",
+                Content = "No fruits selected",
+                Time = 2
+            })
+        end
+    end
+})
+
+-- FIXED: Weight Threshold Input
+Tab:AddTextbox({
+    Name = "Weight Threshold (KG)",
+    Default = "30",
+    TextDisappear = false,
+    Callback = function(value)
+        local num = tonumber(value)
+        if num and num >= 0 and num <= 500 then
+            weightThreshold = num
+            OrionLib:MakeNotification({
+                Name = "Weight Updated",
+                Content = "Weight threshold set to " .. value .. " KG",
+                Time = 2
+            })
+        else
+            OrionLib:MakeNotification({
+                Name = "Invalid Weight",
+                Content = "Please enter a number between 0 and 500",
+                Time = 3
+            })
+        end
+    end
+})
+
+-- FIXED: Refresh Fruit List Button
+Tab:AddButton({
+    Name = "Refresh Fruit List",
+    Callback = function()
+        local options = {"None"}
+        local fruitTypes = getFruitTypes()
+        for _, fruitType in ipairs(fruitTypes) do
+            table.insert(options, fruitType)
+        end
+
+        -- Update the dropdown with new options
+        fruitDropdown:Refresh(options, true)
+
+        OrionLib:MakeNotification({
+            Name = "List Refreshed",
+            Content = "Fruit list updated with " .. (#options - 1) .. " types",
+            Time = 2
+        })
+    end
+})
+
+-- AUTO SHOVEL FUNCTIONS (Integrated from Script 2)
 local function shouldShovelFruit(fruit)
     -- Check if the fruit object has a Weight property
-    if not fruit:FindFirstChild("Weight") then 
-        return false 
-    end
+    if not fruit:FindFirstChild("Weight") then return false end
     
     local success, weight = pcall(function()
         return fruit.Weight.Value
     end)
     
-    if not success then 
-        return false 
-    end
-    
+    if not success then return false end
     return weight < weightThreshold
 end
 
 local function shovelFruit(fruit)
-    -- Auto equip shovel first
+    -- Auto equip shovel
     if CoreFunctions and CoreFunctions.autoEquipShovel then
         CoreFunctions.autoEquipShovel()
-        task.wait(0.1) -- Small delay after equipping
     end
     
     -- Check if the fruit still exists
-    if not fruit or not fruit.Parent then 
-        return 
-    end
+    if not fruit or not fruit.Parent then return end
     
-    -- Get the Remove_Item event directly using the confirmed path
+    -- Fire the remove event for this specific fruit
     local success, Remove_Item = pcall(function()
-        return game:GetService("ReplicatedStorage").GameEvents.Remove_Item
+        return game:GetService("ReplicatedStorage"):FindFirstChild("Events"):FindFirstChild("Remove_Item")
     end)
     
     if success and Remove_Item then
-        -- Fire the event with the fruit object (as confirmed by Sigma Spy)
         local removeSuccess = pcall(function()
             Remove_Item:FireServer(fruit)
         end)
-    else
-        -- Fallback method if the main path fails
-        local success2, gameEvents = pcall(function()
-            return game:GetService("ReplicatedStorage"):FindFirstChild("GameEvents")
-        end)
-        
-        if success2 and gameEvents then
-            local altEvent = gameEvents:FindFirstChild("Remove_Item")
-            if altEvent then
-                pcall(function()
-                    altEvent:FireServer(fruit)
-                end)
-            end
+        if removeSuccess then
+            print("Shoveled fruit:", fruit.Name)
         end
     end
 end
@@ -543,17 +683,11 @@ end
 local function autoShovel()
     if not autoShovelEnabled then return end
     
-    if #selectedFruitTypes == 0 then
-        return
-    end
-    
     local success, plantsPhysical = pcall(function()
         return workspace.Farm.Farm.Important.Plants_Physical
     end)
     
-    if not success or not plantsPhysical then 
-        return 
-    end
+    if not success or not plantsPhysical then return end
     
     -- Get ALL plants universally
     local allPlants = plantsPhysical:GetChildren()
@@ -566,28 +700,17 @@ local function autoShovel()
             
             -- Process each individual fruit object
             for _, individualFruit in pairs(allFruits) do
-                -- Check if this fruit type is selected for shoveling
-                local fruitSelected = false
-                for _, selectedType in ipairs(selectedFruitTypes) do
-                    if individualFruit.Name:find(selectedType) or selectedType:find(individualFruit.Name) then
-                        fruitSelected = true
-                        break
-                    end
-                end
-                
-                if fruitSelected then
-                    -- Only shovel the individual fruit if it meets criteria
-                    if individualFruit and individualFruit.Parent and shouldShovelFruit(individualFruit) then
-                        shovelFruit(individualFruit)
-                        task.wait(0.1) -- Small delay between shoveling each fruit
-                    end
+                -- Only shovel the individual fruit if it meets criteria
+                if individualFruit and individualFruit.Parent and shouldShovelFruit(individualFruit) then
+                    shovelFruit(individualFruit)
+                    task.wait(0.1) -- Small delay between shoveling each fruit
                 end
             end
         end
     end
 end
 
--- UPDATED Auto Shovel Toggle
+-- FIXED: Auto Shovel Toggle (removed duplicate)
 Tab:AddToggle({
     Name = "Auto Shovel",
     Default = false,
@@ -599,7 +722,7 @@ Tab:AddToggle({
             autoShovelConnection = RunService.Heartbeat:Connect(function()
                 if autoShovelEnabled then
                     autoShovel()
-                    task.wait(2) -- Increased wait time to reduce spam
+                    task.wait(1) -- Check every second
                 end
             end)
             
