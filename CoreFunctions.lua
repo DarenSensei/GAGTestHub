@@ -1,5 +1,6 @@
--- GG-Functions.lua
+-- Combined GG-Functions.lua
 -- Complete Functions for Grow A Garden Script Loader
+-- Includes sprinkler management, auto-buy, tree detection, and auto shovel systems
 
 local Functions = {}
 
@@ -15,6 +16,7 @@ local player = Players.LocalPlayer
 
 -- Configuration
 local shovelName = "Shovel [Destroy Plants]"
+local treeShovelName = "Shovel"
 local sprinklerTypes = {
     "Basic Sprinkler",
     "Advanced Sprinkler",
@@ -60,6 +62,12 @@ local allPetsSelected = false
 local petsFolder = nil
 local currentPetsList = {}
 
+-- Tree Management Variables
+local weightThreshold = 1
+local autoShovelEnabled = false
+local selectedTrees = {}
+local autoShovelConnection = nil
+
 -- Auto-buy states
 local autoBuyZenEnabled = false
 local autoBuyMerchantEnabled = false
@@ -83,12 +91,20 @@ local PetZoneAbility = getRemoteEvent("GameEvents") and getRemoteEvent("GameEven
 
 -- Core folders/scripts with error handling
 local shovelClient = nil
+local treeShovelClient = nil
 local shovelPrompt = nil
 local objectsFolder = nil
+local plantsPhysical = nil
 
 -- Initialize core objects safely
 pcall(function()
     shovelClient = player:WaitForChild("PlayerScripts", 5):WaitForChild("Shovel_Client", 5)
+end)
+
+pcall(function()
+    treeShovelClient = player.PlayerGui:FindFirstChild("ShovelClient", true) or 
+                       player.PlayerScripts:FindFirstChild("ShovelClient", true) or
+                       shovelClient
 end)
 
 pcall(function()
@@ -98,6 +114,14 @@ end)
 pcall(function()
     objectsFolder = Workspace:WaitForChild("Farm", 5):WaitForChild("Farm", 5):WaitForChild("Important", 5):WaitForChild("Objects_Physical", 5)
 end)
+
+pcall(function()
+    plantsPhysical = Workspace:WaitForChild("Farm", 5):WaitForChild("Farm", 5):WaitForChild("Important", 5):WaitForChild("Plants_Physical", 5)
+end)
+
+-- ===========================================
+-- AUTO-BUY FUNCTIONS
+-- ===========================================
 
 -- Auto-buy functions with proper connection management
 function Functions.toggleAutoBuyZen(enabled)
@@ -158,7 +182,11 @@ function Functions.buyAllMerchantItems()
     end
 end
 
--- Equip Shovel function
+-- ===========================================
+-- SHOVEL FUNCTIONS
+-- ===========================================
+
+-- Equip Shovel function for sprinklers
 function Functions.autoEquipShovel()
     if not player.Character then return end
     local backpack = player:FindFirstChild("Backpack")
@@ -167,6 +195,20 @@ function Functions.autoEquipShovel()
         shovel.Parent = player.Character
     end
 end
+
+-- Auto equip shovel for trees
+function Functions.autoEquipTreeShovel()
+    if not player.Character then return end
+    local backpack = player:FindFirstChild("Backpack")
+    local shovel = backpack and backpack:FindFirstChild(treeShovelName)
+    if shovel then
+        shovel.Parent = player.Character
+    end
+end
+
+-- ===========================================
+-- SPRINKLER MANAGEMENT FUNCTIONS
+-- ===========================================
 
 -- Sprinklers 
 function Functions.deleteSprinklers(sprinklerArray, OrionLib)
@@ -313,88 +355,13 @@ function Functions.getSelectedSprinklersString()
     return #selectionText > 50 and (selectionText:sub(1, 47) .. "...") or selectionText
 end
 
--- Remove Farms function
-function Functions.removeFarms(OrionLib)
-    local farmFolder = Workspace:FindFirstChild("Farm")
-    if not farmFolder then
-        if OrionLib then
-            OrionLib:MakeNotification({
-                Name = "No Farms Found",
-                Content = "Farm folder not found in Workspace.",
-                Time = 3
-            })
-        end
-        return
-    end
-
-    local playerCharacter = player.Character
-    local rootPart = playerCharacter and playerCharacter:FindFirstChild("HumanoidRootPart")
-    if not rootPart then
-        if OrionLib then
-            OrionLib:MakeNotification({
-                Name = "Player Not Found",
-                Content = "Player character or position not found.",
-                Time = 3
-            })
-        end
-        return
-    end
-
-    local currentFarm = nil
-    local closestDistance = math.huge
-
-    for _, farm in ipairs(farmFolder:GetChildren()) do
-        if farm:IsA("Model") or farm:IsA("Folder") then
-            local farmRoot = farm:FindFirstChild("HumanoidRootPart") or farm:FindFirstChildWhichIsA("BasePart")
-            if farmRoot then
-                local distance = (farmRoot.Position - rootPart.Position).Magnitude
-                if distance < closestDistance then
-                    closestDistance = distance
-                    currentFarm = farm
-                end
-            end
-        end
-    end
-
-    for _, farm in ipairs(farmFolder:GetChildren()) do
-        if farm ~= currentFarm then
-            pcall(function()
-                farm:Destroy()
-            end)
-        end
-    end
-
-    if OrionLib then
-        OrionLib:MakeNotification({
-            Name = "Farms Removed",
-            Content = "All other farms have been deleted.",
-            Time = 3
-        })
-    end
-end
-
--- Configuration
-local shovelName = "Shovel"
-local weightThreshold = 1
-local autoShovelEnabled = false
-local selectedTrees = {}
-local autoShovelConnection = nil
-
--- References
-local plantsPhysical = game:GetService("Workspace").Farm.Farm.Important.Plants_Physical
-local shovelClient = nil
-
--- Try to find shovel client
-pcall(function()
-    shovelClient = player.PlayerGui:FindFirstChild("ShovelClient", true) or 
-                   player.PlayerScripts:FindFirstChild("ShovelClient", true)
-end)
-
--- Functions table
-local Functions = {}
+-- ===========================================
+-- TREE MANAGEMENT FUNCTIONS
+-- ===========================================
 
 -- Get all tree types
 function Functions.getTreeTypes()
+    if not plantsPhysical then return {} end
     local treeTypes = {}
     for _, child in ipairs(plantsPhysical:GetChildren()) do
         if child:IsA("Folder") or child:IsA("Model") then
@@ -411,6 +378,10 @@ end
 
 function Functions.addTreeToSelection(treeName)
     selectedTrees[treeName] = true
+end
+
+function Functions.removeTreeFromSelection(treeName)
+    selectedTrees[treeName] = nil
 end
 
 function Functions.getSelectedTrees()
@@ -440,18 +411,13 @@ function Functions.getSelectedTreesString()
     end
 end
 
--- Auto equip shovel
-function Functions.autoEquipShovel()
-    if not player.Character then return end
-    local backpack = player:FindFirstChild("Backpack")
-    local shovel = backpack and backpack:FindFirstChild(shovelName)
-    if shovel then
-        shovel.Parent = player.Character
-    end
+function Functions.isTreeSelected(treeName)
+    return selectedTrees[treeName] == true
 end
 
 -- Get tree weight
 function Functions.getTreeWeight(treeName)
+    if not plantsPhysical then return 0 end
     local tree = plantsPhysical:FindFirstChild(treeName)
     if tree and tree:FindFirstChild("Weight") then
         return tree.Weight.Value or 0
@@ -461,6 +427,7 @@ end
 
 -- Get fruits from tree
 function Functions.getTreeFruits(treeName)
+    if not plantsPhysical then return {} end
     local fruits = {}
     local tree = plantsPhysical:FindFirstChild(treeName)
     if tree and tree:FindFirstChild("Fruit_Spawn") then
@@ -473,13 +440,13 @@ end
 
 -- Shovel fruit
 function Functions.shovelFruit(fruit)
-    if not fruit or not fruit.Parent or not shovelClient then return false end
+    if not fruit or not fruit.Parent or not treeShovelClient then return false end
     
-    Functions.autoEquipShovel()
+    Functions.autoEquipTreeShovel()
     task.wait(0.1)
     
     local success, destroyEnv = pcall(function()
-        return getsenv and getsenv(shovelClient) or nil
+        return getsenv and getsenv(treeShovelClient) or nil
     end)
     
     if not success or not destroyEnv then return false end
@@ -543,6 +510,10 @@ function Functions.setWeightThreshold(newThreshold, OrionLib)
     return false
 end
 
+function Functions.getWeightThreshold()
+    return weightThreshold
+end
+
 -- Toggle auto shovel
 function Functions.toggleAutoShovel(OrionLib)
     autoShovelEnabled = not autoShovelEnabled
@@ -578,6 +549,10 @@ function Functions.toggleAutoShovel(OrionLib)
     return autoShovelEnabled
 end
 
+function Functions.getAutoShovelEnabled()
+    return autoShovelEnabled
+end
+
 -- Auto shovel loop
 function Functions.autoShovelSelectedLoop()
     return RunService.Heartbeat:Connect(function()
@@ -588,38 +563,73 @@ function Functions.autoShovelSelectedLoop()
     end)
 end
 
--- ===========AUTO MIDDLE PETS===============
+-- ===========================================
+-- FARM MANAGEMENT FUNCTIONS
+-- ===========================================
 
--- Function to reduce lag
-function Functions.reduceLag()
-    pcall(function()
-        repeat
-            local lag = game.Workspace:findFirstChild("Lag", true)
-            if (lag ~= nil) then
-                lag:remove()
-            end
-            wait(0.1) -- Add small delay to prevent infinite tight loop
-        until (game.Workspace:findFirstChild("Lag", true) == nil)
-    end)
-end
-
--- Function to fade in main tab
-function Functions.fadeInMainTab()
-    pcall(function()
-        local screenGui = player:WaitForChild("PlayerGui", 5):WaitForChild("Orion", 5)
-        local mainFrame = screenGui:WaitForChild("Main", 5)
-        if mainFrame then
-            mainFrame.BackgroundTransparency = 1
-
-            local tween = TweenService:Create(
-                mainFrame,
-                TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                { BackgroundTransparency = 0.2 }
-            )
-            tween:Play()
+-- Remove Farms function
+function Functions.removeFarms(OrionLib)
+    local farmFolder = Workspace:FindFirstChild("Farm")
+    if not farmFolder then
+        if OrionLib then
+            OrionLib:MakeNotification({
+                Name = "No Farms Found",
+                Content = "Farm folder not found in Workspace.",
+                Time = 3
+            })
         end
-    end)
+        return
+    end
+
+    local playerCharacter = player.Character
+    local rootPart = playerCharacter and playerCharacter:FindFirstChild("HumanoidRootPart")
+    if not rootPart then
+        if OrionLib then
+            OrionLib:MakeNotification({
+                Name = "Player Not Found",
+                Content = "Player character or position not found.",
+                Time = 3
+            })
+        end
+        return
+    end
+
+    local currentFarm = nil
+    local closestDistance = math.huge
+
+    for _, farm in ipairs(farmFolder:GetChildren()) do
+        if farm:IsA("Model") or farm:IsA("Folder") then
+            local farmRoot = farm:FindFirstChild("HumanoidRootPart") or farm:FindFirstChildWhichIsA("BasePart")
+            if farmRoot then
+                local distance = (farmRoot.Position - rootPart.Position).Magnitude
+                if distance < closestDistance then
+                    closestDistance = distance
+                    currentFarm = farm
+                end
+            end
+        end
+    end
+
+    for _, farm in ipairs(farmFolder:GetChildren()) do
+        if farm ~= currentFarm then
+            pcall(function()
+                farm:Destroy()
+            end)
+        end
+    end
+
+    if OrionLib then
+        OrionLib:MakeNotification({
+            Name = "Farms Removed",
+            Content = "All other farms have been deleted.",
+            Time = 3
+        })
+    end
 end
+
+-- ===========================================
+-- UTILITY FUNCTIONS
+-- ===========================================
 
 -- Server hopping function
 function Functions.serverHop()
@@ -668,6 +678,10 @@ function Functions.copyDiscordLink()
     end)
 end
 
+-- ===========================================
+-- CLEANUP FUNCTIONS
+-- ===========================================
+
 -- Cleanup function
 function Functions.cleanup()
     -- Cleanup auto-buy connections
@@ -680,6 +694,12 @@ function Functions.cleanup()
         merchantBuyConnection = nil
     end
     
+    -- Cleanup auto shovel connection
+    if autoShovelConnection then
+        autoShovelConnection:Disconnect()
+        autoShovelConnection = nil
+    end
+    
     -- Clean up ESP markers
     for petId, esp in pairs(excludedPetESPs) do
         if esp then
@@ -689,6 +709,11 @@ function Functions.cleanup()
         end
     end
     excludedPetESPs = {}
+    
+    -- Reset states
+    autoShovelEnabled = false
+    autoBuyZenEnabled = false
+    autoBuyMerchantEnabled = false
 end
 
 -- Export configuration tables and variables
