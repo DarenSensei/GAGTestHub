@@ -481,6 +481,59 @@ Tab:AddToggle({
     end
 })
 
+
+Tab:AddParagraph("Auto Shovel", "Auto Shovel")
+
+local treeDropdown = Tab:AddDropdown({
+    Name = "Select Trees to Shovel",
+    Default = {},
+    Options = (function()
+        local options = {"None"}
+        for _, treeType in ipairs(Functions.getTreeTypes()) do
+            table.insert(options, treeType)
+        end
+        return options
+    end)(),
+    Callback = function(selectedValues)
+        Functions.clearSelectedTrees()
+        -- [rest of dropdown callback code]
+    end
+})
+
+local weightSlider = Tab:AddSlider({
+    Name = "Weight Threshold (kg)",
+    Min = 1,
+    Max = 500,
+    Default = 1,
+    Color = Color3.fromRGB(255, 255, 255),
+    Increment = 1,
+    ValueName = "kg",
+    Callback = function(Value)
+        Functions.setWeightThreshold(Value, OrionLib)
+    end    
+})
+
+local autoShovelToggle = Tab:AddToggle({
+    Name = "Auto Shovel Fruits",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            -- Check if any trees are selected
+            if Functions.getSelectedTreesCount() == 0 then
+                OrionLib:MakeNotification({
+                    Name = "No Trees Selected",
+                    Content = "Please select trees from the dropdown first",
+                    Time = 3
+                })
+                autoShovelToggle:Set(false)
+                return
+            end
+        end
+        Functions.toggleAutoShovel(OrionLib)
+    end
+})
+
+
 local ShopTab = Window:MakeTab({
     Name = "Shop",
     Icon = "rbxassetid://4835310745",
