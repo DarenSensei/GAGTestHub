@@ -643,74 +643,6 @@ Tab:AddButton({
     end
 })
 
--- AUTO SHOVEL FUNCTIONS (Integrated from Script 2)
-local function shouldShovelFruit(fruit)
-    -- Check if the fruit object has a Weight property
-    if not fruit:FindFirstChild("Weight") then return false end
-    
-    local success, weight = pcall(function()
-        return fruit.Weight.Value
-    end)
-    
-    if not success then return false end
-    return weight < weightThreshold
-end
-
-local function shovelFruit(fruit)
-    -- Auto equip shovel
-    if CoreFunctions and CoreFunctions.autoEquipShovel then
-        CoreFunctions.autoEquipShovel()
-    end
-    
-    -- Check if the fruit still exists
-    if not fruit or not fruit.Parent then return end
-    
-    -- Fire the remove event for this specific fruit
-    local success, Remove_Item = pcall(function()
-        return game:GetService("ReplicatedStorage"):FindFirstChild("Events"):FindFirstChild("Remove_Item")
-    end)
-    
-    if success and Remove_Item then
-        local removeSuccess = pcall(function()
-            Remove_Item:FireServer(fruit)
-        end)
-        if removeSuccess then
-            print("Shoveled fruit:", fruit.Name)
-        end
-    end
-end
-
-local function autoShovel()
-    if not autoShovelEnabled then return end
-    
-    local success, plantsPhysical = pcall(function()
-        return workspace.Farm.Farm.Important.Plants_Physical
-    end)
-    
-    if not success or not plantsPhysical then return end
-    
-    -- Get ALL plants universally
-    local allPlants = plantsPhysical:GetChildren()
-    
-    for _, plant in pairs(allPlants) do
-        -- Check if this plant has a Fruits folder
-        if plant:FindFirstChild("Fruits") then
-            local fruitsFolder = plant.Fruits
-            local allFruits = fruitsFolder:GetChildren()
-            
-            -- Process each individual fruit object
-            for _, individualFruit in pairs(allFruits) do
-                -- Only shovel the individual fruit if it meets criteria
-                if individualFruit and individualFruit.Parent and shouldShovelFruit(individualFruit) then
-                    shovelFruit(individualFruit)
-                    task.wait(0.1) -- Small delay between shoveling each fruit
-                end
-            end
-        end
-    end
-end
-
--- FIXED: Auto Shovel Toggle (removed duplicate)
 Tab:AddToggle({
     Name = "Auto Shovel",
     Default = false,
@@ -722,7 +654,7 @@ Tab:AddToggle({
             autoShovelConnection = RunService.Heartbeat:Connect(function()
                 if autoShovelEnabled then
                     autoShovel()
-                    task.wait(1) -- Check every second
+                    task.wait(2) -- Increased wait time to reduce spam
                 end
             end)
             
