@@ -71,6 +71,13 @@ local cropWeightThreshold = 1
 local autoShovelCropsEnabled = false
 local autoShovelCropsConnection = nil
 
+-- NEW: Tree Control Variables
+local selectedTreeTypes = {}
+local treeWeightThreshold = 1
+local autoShovelTreesEnabled = false
+local autoShovelTreesConnection = nil
+local currentFarm = nil
+
 -- Remote Events with error handling
 local function getRemoteEvent(path)
     local success, result = pcall(function()
@@ -104,7 +111,334 @@ pcall(function()
     objectsFolder = Workspace:WaitForChild("Farm", 5):WaitForChild("Farm", 5):WaitForChild("Important", 5):WaitForChild("Objects_Physical", 5)
 end)
 
--- CROP SYSTEM FUNCTIONS
+-- NEW: FARM DETECTION SYSTEM
+
+-- Function to detect current farm (nearest farm to player)
+local function detectCurrentFarm()
+    local farmFolder = Workspace:FindFirstChild("Farm")
+    if not farmFolder then 
+        warn("Farm folder not found in Workspace")
+        return nil 
+    end
+
+    local playerCharacter = player.Character
+    local rootPart = playerCharacter and playerCharacter:FindFirstChild("HumanoidRootPart")
+    if not rootPart then
+        warn("Player character or position not found")
+        return nil
+    end
+
+    local nearestFarm = nil
+    local closestDistance = math.huge
+
+    -- Find the nearest farm to the player
+    for _, farm in ipairs(farmFolder:GetChildren()) do
+        if farm:IsA("Model") or farm:IsA("Folder") then
+            local farmRoot = farm:FindFirstChild("HumanoidRootPart") or farm:FindFirstChildWhichIsA("BasePart")
+            if farmRoot then
+                local distance = (farmRoot.Position - rootPart.Position).Magnitude
+                if distance < closestDistance then
+                    closestDistance = distance
+                    nearestFarm = farm
+                end
+            end
+        end
+    end
+
+    if nearestFarm then
+        print("Detected current farm: " .. nearestFarm.Name .. " (Distance: " .. math.floor(closestDistance) .. ")")
+    else
+        warn("No farm detected")
+    end
+
+    return nearestFarm
+end
+
+-- Function to get Plants_Physical folder from current farm
+local function getPlantsPhysicalFolder()
+    if not currentFarm then
+        currentFarm = detectCurrentFarm()
+    end
+    
+    if not currentFarm then 
+        return nil 
+    end
+    
+    local success, plantsPhysical = pcall(function()
+        return currentFarm:FindFirstChild("Farm"):FindFirstChild("Important"):FindFirstChild("Plants_Physical")
+    end)
+    
+    if success and plantsPhysical then
+        return plantsPhysical
+    else
+        warn("Could not access Plants_Physical folder in current farm")
+        return nil
+    end
+end
+
+-- NEW: TREE DETECTION SYSTEM
+
+-- Helper function to check if fruit (tree) should be shoveled
+local function shouldShovelFruit(fruit)
+    if not fruit or not fruit.Parent then 
+        return false 
+    end
+    
+    -- Check if the fruit has a Weight property
+    local weightObject = fruit:FindFirstChild("Weight")
+    if not weightObject then 
+        return false 
+    end
+    
+    local success, weight = pcall(function()
+        return weightObject.Value
+    end)
+    
+    if not success or not weight then 
+        return false 
+    end
+    
+    return weight < treeWeightThreshold
+end
+
+-- Function to shovel individual fruit (tree)
+local function shovelFruit(fruit)
+    if not fruit or not fruit.Parent then 
+        warn("Fruit no longer exists, skipping")
+        return false
+    end
+    
+    -- Auto equip shovel first
+    Functions.autoEquipShovel()
+    task.wait(0.1) -- Small delay after equipping
+    
+    -- Double check fruit still exists after delay
+    if not fruit or not fruit.Parent then 
+        warn("Fruit disappeared after equipping shovel")
+        return false
+    end
+    
+    -- Use RemoveItem to delete the fruit
+    if not RemoveItem then
+        warn("Remove_Item event not found")
+        return false
+    end
+    
+    local removeSuccess = pcall(function()
+        RemoveItem:FireServer(fruit)
+    end)
+    
+    if removeSuccess then
+        print("Successfully sent remove request for fruit: " .. fruit.Name)
+    else
+        warn("Failed to remove fruit: " .. fruit.Name)
+    end
+    
+    return removeSuccess
+end
+
+-- Check if tree type is selected
+local function isTreeTypeSelected(treeName)
+    if #selectedTreeTypes == 0 then
+        return false
+    end
+    
+    for _, selectedType in ipairs(selectedTreeTypes) do
+        -- Exact match or partial match
+        if treeName == selectedType or 
+           treeName:find(selectedType) or 
+           selectedType:find(treeName) then
+            return true
+        end
+    end
+    return false
+end
+
+-- Main auto shovel trees function
+local function autoShovelTrees()
+    if not autoShovelTreesEnabled then 
+        return 
+    end
+    
+    if #selectedTreeTypes == 0 then
+        return
+    end
+    
+    -- Get Plants_Physical folder from current farm
+    local plantsPhysical = getPlantsPhysicalFolder()
+    if not plantsPhysical then 
+        return 
+    end
+    
+    -- Get all plants from Plants_Physical
+    local allPlants = plantsPhysical:GetChildren()
+    
+    -- Process each plant for fruits (trees)
+    for plantIndex, plant in pairs(allPlants) do
+        if plant and plant.Parent then
+            -- Look for Fruits folder in each plant
+            local fruitsFolder = plant:FindFirstChild("Fruits")
+            if fruitsFolder then
+                local allFruits = fruitsFolder:GetChildren()
+                
+                for _, fruit in pairs(allFruits) do
+                    -- Check if this fruit has Weight property
+                    if fruit:FindFirstChild("Weight") then
+                        local fruitName = fruit.Name
+                        
+                        -- Check if this tree type is selected for shoveling
+                        if isTreeTypeSelected(fruitName) then
+                            -- Check if this specific fruit meets weight criteria
+                            if shouldShovelFruit(fruit) then
+                                local success = shovelFruit(fruit)
+                                if success then
+                                    task.wait(0.15) -- Small delay between shoveling each fruit
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Get all available tree types by checking all plants' fruits
+function Functions.getTreeTypes()
+    local treeTypes = {}
+    
+    -- Get Plants_Physical folder
+    local plantsPhysical = getPlantsPhysicalFolder()
+    if not plantsPhysical then 
+        return treeTypes
+    end
+    
+    -- Get all plants
+    local allPlants = plantsPhysical:GetChildren()
+    
+    -- Collect unique fruit names from all plants
+    local uniqueFruits = {}
+    for plantIndex, plant in pairs(allPlants) do
+        local fruitsFolder = plant:FindFirstChild("Fruits")
+        if fruitsFolder then
+            local allFruits = fruitsFolder:GetChildren()
+            
+            for _, fruit in pairs(allFruits) do
+                -- Only include items that have a Weight property
+                if fruit:FindFirstChild("Weight") and not uniqueFruits[fruit.Name] then
+                    uniqueFruits[fruit.Name] = true
+                    table.insert(treeTypes, fruit.Name)
+                end
+            end
+        end
+    end
+    
+    -- Sort alphabetically for better organization
+    table.sort(treeTypes)
+    return treeTypes
+end
+
+-- Refresh tree list for dropdown
+function Functions.refreshTreeList()
+    currentFarm = detectCurrentFarm() -- Update current farm
+    local newOptions = {"None"}
+    local treeTypes = Functions.getTreeTypes()
+    for _, treeType in ipairs(treeTypes) do
+        table.insert(newOptions, treeType)
+    end
+    return newOptions
+end
+
+-- Clear selected trees
+function Functions.clearSelectedTrees()
+    selectedTreeTypes = {}
+end
+
+-- Add tree to selection
+function Functions.addTreeToSelection(treeName)
+    if treeName and treeName ~= "None" and not table.find(selectedTreeTypes, treeName) then
+        table.insert(selectedTreeTypes, treeName)
+    end
+end
+
+-- Set tree weight threshold
+function Functions.setTreeWeightThreshold(weight)
+    local num = tonumber(weight)
+    if num and num >= 0 and num <= 500 then
+        treeWeightThreshold = num
+        return true
+    end
+    return false
+end
+
+-- Set selected trees array
+function Functions.setSelectedTrees(treeArray)
+    selectedTreeTypes = treeArray or {}
+end
+
+-- Get selected trees
+function Functions.getSelectedTrees()
+    return selectedTreeTypes
+end
+
+-- Get selected trees count
+function Functions.getSelectedTreesCount()
+    return #selectedTreeTypes
+end
+
+-- Get selected trees as string
+function Functions.getSelectedTreesString()
+    if #selectedTreeTypes == 0 then
+        return "None"
+    end
+    return table.concat(selectedTreeTypes, ", ")
+end
+
+-- Toggle auto shovel trees
+function Functions.toggleAutoShovelTrees(enabled, OrionLib)
+    autoShovelTreesEnabled = enabled
+    
+    if enabled then
+        -- Disconnect existing connection
+        if autoShovelTreesConnection then 
+            autoShovelTreesConnection:Disconnect() 
+        end
+        
+        -- Create new connection with proper error handling
+        autoShovelTreesConnection = RunService.Heartbeat:Connect(function()
+            if autoShovelTreesEnabled then
+                pcall(function()
+                    autoShovelTrees()
+                end)
+                task.wait(1) -- Check every second
+            end
+        end)
+        
+        if OrionLib then
+            OrionLib:MakeNotification({
+                Name = "Auto Shovel Trees",
+                Content = "Enabled for " .. Functions.getSelectedTreesCount() .. " types",
+                Time = 2
+            })
+        end
+    else
+        -- Disable auto shovel trees
+        if autoShovelTreesConnection then
+            autoShovelTreesConnection:Disconnect()
+            autoShovelTreesConnection = nil
+        end
+        
+        if OrionLib then
+            OrionLib:MakeNotification({
+                Name = "Auto Shovel Trees",
+                Content = "Disabled",
+                Time = 1
+            })
+        end
+    end
+end
+
+-- EXISTING CROP SYSTEM FUNCTIONS (Updated to use new farm detection)
 
 -- Helper function to check if crop should be shoveled
 local function shouldShovelCrop(crop)
@@ -182,7 +516,7 @@ local function isCropTypeSelected(cropName)
     return false
 end
 
--- Main auto shovel crops function
+-- Main auto shovel crops function (Updated)
 local function autoShovelCrops()
     if not autoShovelCropsEnabled then 
         return 
@@ -192,23 +526,9 @@ local function autoShovelCrops()
         return
     end
     
-    -- Access the Plants_Physical folder for crops
-    local plantsPhysical = nil
-    local success = pcall(function()
-        local farm = Workspace:FindFirstChild("Farm")
-        if farm then
-            local farmInner = farm:FindFirstChild("Farm")
-            if farmInner then
-                local important = farmInner:FindFirstChild("Important")
-                if important then
-                    plantsPhysical = important:FindFirstChild("Plants_Physical")
-                end
-            end
-        end
-    end)
-    
-    if not success or not plantsPhysical then 
-        warn("Could not access Plants_Physical folder for crops")
+    -- Get Plants_Physical folder from current farm
+    local plantsPhysical = getPlantsPhysicalFolder()
+    if not plantsPhysical then 
         return 
     end
     
@@ -242,27 +562,13 @@ local function autoShovelCrops()
     end
 end
 
--- Get all available crop types by checking all plants
+-- Get all available crop types by checking all plants (Updated)
 function Functions.getCropTypes()
     local cropTypes = {}
     
-    -- Access Plants_Physical folder
-    local plantsPhysical = nil
-    local success = pcall(function()
-        local farm = Workspace:FindFirstChild("Farm")
-        if farm then
-            local farmInner = farm:FindFirstChild("Farm")
-            if farmInner then
-                local important = farmInner:FindFirstChild("Important")
-                if important then
-                    plantsPhysical = important:FindFirstChild("Plants_Physical")
-                end
-            end
-        end
-    end)
-    
-    if not success or not plantsPhysical then 
-        warn("Could not access Plants_Physical for getting crop types")
+    -- Get Plants_Physical folder from current farm
+    local plantsPhysical = getPlantsPhysicalFolder()
+    if not plantsPhysical then 
         return cropTypes
     end
     
@@ -288,8 +594,9 @@ function Functions.getCropTypes()
     return cropTypes
 end
 
--- Refresh crop list for dropdown
+-- Refresh crop list for dropdown (Updated)
 function Functions.refreshCropList()
+    currentFarm = detectCurrentFarm() -- Update current farm
     local newOptions = {"None"}
     local cropTypes = Functions.getCropTypes()
     for _, cropType in ipairs(cropTypes) do
@@ -726,6 +1033,12 @@ function Functions.cleanup()
         autoShovelCropsConnection = nil
     end
     
+    -- Clean up auto shovel trees connection
+    if autoShovelTreesConnection then
+        autoShovelTreesConnection:Disconnect()
+        autoShovelTreesConnection = nil
+    end
+    
     -- Clean up ESP markers
     for petId, esp in pairs(excludedPetESPs) do
         if esp then
@@ -752,7 +1065,18 @@ Functions.selectedCropTypes = selectedCropTypes
 Functions.cropWeightThreshold = cropWeightThreshold
 Functions.autoShovelCropsEnabled = autoShovelCropsEnabled
 
--- Export the main auto shovel crops function
+-- Export the tree variables to the main Functions table
+Functions.selectedTreeTypes = selectedTreeTypes
+Functions.treeWeightThreshold = treeWeightThreshold
+Functions.autoShovelTreesEnabled = autoShovelTreesEnabled
+
+-- Export the main auto shovel functions
 Functions.autoShovelCrops = autoShovelCrops
+Functions.autoShovelTrees = autoShovelTrees
+
+-- Export farm detection functions
+Functions.detectCurrentFarm = detectCurrentFarm
+Functions.getPlantsPhysicalFolder = getPlantsPhysicalFolder
+Functions.currentFarm = currentFarm
 
 return Functions
