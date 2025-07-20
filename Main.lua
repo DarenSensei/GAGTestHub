@@ -487,7 +487,7 @@ Tab:AddParagraph("Auto Shovel", "Auto Shovel")
 local treeDropdown = Tab:AddDropdown({
     Name = "Select Trees to Shovel",
     Default = {},
-    Options = (function()
+    Options = function()
         local options = {"None"}
         for _, treeType in ipairs(Functions.getTreeTypes()) do
             table.insert(options, treeType)
