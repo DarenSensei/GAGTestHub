@@ -95,39 +95,6 @@ local function getSelectedSprinklersString()
     return CoreFunctions.getSelectedSprinklersString()
 end
 
--- FIXED: Auto Shovel helper functions using CoreFunctions
-local function getFruitTypes()
-    return CoreFunctions.getFruitTypes()
-end
-
-local function clearSelectedFruits()
-    selectedFruitTypes = {}
-    CoreFunctions.clearSelectedFruits()
-end
-
-local function addFruitToSelection(fruitName)
-    if not table.find(selectedFruitTypes, fruitName) then
-        table.insert(selectedFruitTypes, fruitName)
-        CoreFunctions.addFruitToSelection(fruitName)
-    end
-end
-
-local function getSelectedFruitsCount()
-    return #selectedFruitTypes
-end
-
-local function getSelectedFruitsString()
-    if #selectedFruitTypes == 0 then
-        return "None"
-    end
-    local selectionText = table.concat(selectedFruitTypes, ", ")
-    return #selectionText > 50 and (selectionText:sub(1, 47) .. "...") or selectionText
-end
-
-local function autoShovel()
-    CoreFunctions.autoShovel()
-end
-
 -- Pet helper functions
 local function refreshPets()
     return PetFunctions.refreshPets()
@@ -466,27 +433,23 @@ Tab:AddToggle({
     end
 })
 
--- Auto Shovel Section
-Tab:AddParagraph("Auto Shovel", "Automatically shovel fruits based on weight threshold.")
+-- Auto Shovel Section - FIXED
+Tab:AddParagraph("Auto Shovel Crops", "Automatically shovel crops based on weight threshold.")
 
-
--- Auto Shovel Crops - UI Buttons
--- Add these buttons to your Main script Tab
-
--- Crop selection dropdown
+-- Crop selection dropdown - FIXED to use CoreFunctions
 local cropDropdown = Tab:AddDropdown({
     Name = "Select Crops to Shovel",
     Default = {},
     Options = (function()
         local options = {"None"}
-        local cropTypes = Functions.getCropTypes()
+        local cropTypes = CoreFunctions.getCropTypes()  -- Changed from Functions to CoreFunctions
         for _, cropType in ipairs(cropTypes) do
             table.insert(options, cropType)
         end
         return options
     end)(),
     Callback = function(selectedValues)
-        Functions.clearSelectedCrops()
+        CoreFunctions.clearSelectedCrops()  -- Changed from Functions to CoreFunctions
         if selectedValues and #selectedValues > 0 then
             local hasNone = false
             for _, value in pairs(selectedValues) do
@@ -497,38 +460,38 @@ local cropDropdown = Tab:AddDropdown({
             end
             if not hasNone then
                 for _, cropName in pairs(selectedValues) do
-                    Functions.addCropToSelection(cropName)
+                    CoreFunctions.addCropToSelection(cropName)  -- Changed from Functions to CoreFunctions
                 end
             end
         end
     end
 })
 
--- Crop weight threshold input
+-- Crop weight threshold input - FIXED
 Tab:AddTextbox({
     Name = "Crop Weight Threshold (KG)",
     Default = "1",
     TextDisappear = false,
     Callback = function(value)
-        Functions.setCropWeightThreshold(value)
+        CoreFunctions.setCropWeightThreshold(value)  -- Changed from Functions to CoreFunctions
     end
 })
 
--- Refresh crop list button
+-- Refresh crop list button - FIXED
 Tab:AddButton({
     Name = "Refresh Crop List",
     Callback = function()
-        local options = Functions.refreshCropList()
+        local options = CoreFunctions.refreshCropList()  -- Changed from Functions to CoreFunctions
         cropDropdown:Refresh(options, true)
     end
 })
 
--- Auto shovel crops toggle
+-- Auto shovel crops toggle - FIXED
 Tab:AddToggle({
     Name = "Auto Shovel Crops",
     Default = false,
     Callback = function(value)
-        Functions.toggleAutoShovelCrops(value, OrionLib)
+        CoreFunctions.toggleAutoShovelCrops(value, OrionLib)  -- Changed from Functions to CoreFunctions
     end
 })
 
