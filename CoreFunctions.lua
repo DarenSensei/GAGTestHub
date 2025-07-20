@@ -329,13 +329,15 @@ function Functions.autoShovelEquipShovel()
     local shovel = backpack and backpack:FindFirstChild(shovelName)
     if shovel then
         shovel.Parent = player.Character
+        -- Wait a moment for the tool to equip properly
+        task.wait(0.1)
     end
 end
 
 function Functions.getFruitTypes()
     local fruitTypes = {}
     local success, plantsPhysical = pcall(function()
-        return Workspace.Farm.Farm.Important.Plants_Physical
+        return workspace.Farm.Farm.Important.Plants_Physical
     end)
     
     if not success or not plantsPhysical then return fruitTypes end
@@ -359,14 +361,20 @@ function Functions.shouldShovelFruit(fruit)
 end
 
 function Functions.shovelFruit(fruit)
+    -- Ensure shovel is equipped
     Functions.autoShovelEquipShovel()
-    task.wait(0.1)
+    
+    -- Check if the fruit still exists before attempting to shovel
+    if not fruit or not fruit.Parent then return end
     
     -- Fire the remove event
     if Remove_Item then
-        pcall(function()
+        local success = pcall(function()
             Remove_Item:FireServer(fruit)
         end)
+        if success then
+            print("Shoveled fruit:", fruit.Name)
+        end
     end
 end
 
@@ -374,7 +382,7 @@ function Functions.autoShovel()
     if not autoShovelEnabled then return end
     
     local success, plantsPhysical = pcall(function()
-        return Workspace.Farm.Farm.Important.Plants_Physical
+        return workspace.Farm.Farm.Important.Plants_Physical
     end)
     
     if not success or not plantsPhysical then return end
@@ -385,10 +393,19 @@ function Functions.autoShovel()
             if plant and plant:FindFirstChild("Fruits") then
                 local fruits = plant.Fruits:GetChildren()
                 
+                -- Create a copy of the fruits table to avoid iteration issues
+                local fruitsToShovel = {}
                 for _, fruit in pairs(fruits) do
                     if Functions.shouldShovelFruit(fruit) then
+                        table.insert(fruitsToShovel, fruit)
+                    end
+                end
+                
+                -- Shovel the fruits
+                for _, fruit in pairs(fruitsToShovel) do
+                    if fruit and fruit.Parent then -- Double-check fruit still exists
                         Functions.shovelFruit(fruit)
-                        task.wait(0.1) -- Small delay between shoveling
+                        task.wait(0.2) -- Slightly longer delay for stability
                     end
                 end
             end
