@@ -322,43 +322,77 @@ function Functions.autoShovelEquipShovel()
     end
 end
 
-function Functions.shouldShovelFruit(fruit)
+-- FIXED AUTO SHOVEL FUNCTIONS
+local function shouldShovelFruit(fruit)
     -- Check if the fruit object has a Weight property
-    if not fruit:FindFirstChild("Weight") then return false end
+    if not fruit:FindFirstChild("Weight") then 
+        return false 
+    end
     
     local success, weight = pcall(function()
         return fruit.Weight.Value
     end)
     
-    if not success then return false end
+    if not success then 
+        return false 
+    end
+    
     return weight < weightThreshold
 end
 
-function Functions.shovelFruit(fruit)
-    Functions.autoShovelEquipShovel()
+local function shovelFruit(fruit)
+    -- Auto equip shovel first
+    if CoreFunctions and CoreFunctions.autoEquipShovel then
+        CoreFunctions.autoEquipShovel()
+        task.wait(0.1) -- Small delay after equipping
+    end
     
     -- Check if the fruit still exists
-    if not fruit or not fruit.Parent then return end
+    if not fruit or not fruit.Parent then 
+        return 
+    end
     
-    -- Fire the remove event for this specific fruit
-    if Remove_Item then
-        local success = pcall(function()
+    -- Get the Remove_Item event directly using the confirmed path
+    local success, Remove_Item = pcall(function()
+        return game:GetService("ReplicatedStorage").GameEvents.Remove_Item
+    end)
+    
+    if success and Remove_Item then
+        -- Fire the event with the fruit object (as confirmed by Sigma Spy)
+        local removeSuccess = pcall(function()
             Remove_Item:FireServer(fruit)
         end)
-        if success then
-            print("Shoveled fruit:", fruit.Name)
+    else
+        -- Fallback method if the main path fails
+        local success2, gameEvents = pcall(function()
+            return game:GetService("ReplicatedStorage"):FindFirstChild("GameEvents")
+        end)
+        
+        if success2 and gameEvents then
+            local altEvent = gameEvents:FindFirstChild("Remove_Item")
+            if altEvent then
+                pcall(function()
+                    altEvent:FireServer(fruit)
+                end)
+            end
         end
     end
 end
 
-function Functions.autoShovel()
+local function autoShovel()
     if not autoShovelEnabled then return end
+    
+    if #selectedFruitTypes == 0 then
+        return
+    end
     
     local success, plantsPhysical = pcall(function()
         return workspace.Farm.Farm.Important.Plants_Physical
     end)
     
-    if not success or not plantsPhysical then return end
+    if not success or not plantsPhysical then 
+        return 
+    end
     
     -- Get ALL plants universally
     local allPlants = plantsPhysical:GetChildren()
@@ -371,16 +405,26 @@ function Functions.autoShovel()
             
             -- Process each individual fruit object
             for _, individualFruit in pairs(allFruits) do
-                -- Only shovel the individual fruit if it meets criteria
-                if individualFruit and individualFruit.Parent and Functions.shouldShovelFruit(individualFruit) then
-                    Functions.shovelFruit(individualFruit)
-                    task.wait(0.1) -- Small delay between shoveling each fruit
+                -- Check if this fruit type is selected for shoveling
+                local fruitSelected = false
+                for _, selectedType in ipairs(selectedFruitTypes) do
+                    if individualFruit.Name:find(selectedType) or selectedType:find(individualFruit.Name) then
+                        fruitSelected = true
+                        break
+                    end
+                end
+                
+                if fruitSelected then
+                    -- Only shovel the individual fruit if it meets criteria
+                    if individualFruit and individualFruit.Parent and shouldShovelFruit(individualFruit) then
+                        shovelFruit(individualFruit)
+                        task.wait(0.1) -- Small delay between shoveling each fruit
+                    end
                 end
             end
         end
     end
-end
-function Functions.refreshFruitList()
+endfunction Functions.refreshFruitList()
     local newOptions = {"None"}
     for _, fruitType in ipairs(Functions.getFruitTypes()) do
         table.insert(newOptions, fruitType)
