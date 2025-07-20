@@ -373,6 +373,221 @@ function Functions.removeFarms(OrionLib)
     end
 end
 
+-- Configuration
+local shovelName = "Shovel"
+local weightThreshold = 1
+local autoShovelEnabled = false
+local selectedTrees = {}
+local autoShovelConnection = nil
+
+-- References
+local plantsPhysical = game:GetService("Workspace").Farm.Farm.Important.Plants_Physical
+local shovelClient = nil
+
+-- Try to find shovel client
+pcall(function()
+    shovelClient = player.PlayerGui:FindFirstChild("ShovelClient", true) or 
+                   player.PlayerScripts:FindFirstChild("ShovelClient", true)
+end)
+
+-- Functions table
+local Functions = {}
+
+-- Get all tree types
+function Functions.getTreeTypes()
+    local treeTypes = {}
+    for _, child in ipairs(plantsPhysical:GetChildren()) do
+        if child:IsA("Folder") or child:IsA("Model") then
+            table.insert(treeTypes, child.Name)
+        end
+    end
+    return treeTypes
+end
+
+-- Tree selection functions
+function Functions.clearSelectedTrees()
+    selectedTrees = {}
+end
+
+function Functions.addTreeToSelection(treeName)
+    selectedTrees[treeName] = true
+end
+
+function Functions.getSelectedTrees()
+    local selected = {}
+    for treeName, _ in pairs(selectedTrees) do
+        table.insert(selected, treeName)
+    end
+    return selected
+end
+
+function Functions.getSelectedTreesCount()
+    local count = 0
+    for _, _ in pairs(selectedTrees) do
+        count = count + 1
+    end
+    return count
+end
+
+function Functions.getSelectedTreesString()
+    local selected = Functions.getSelectedTrees()
+    if #selected == 0 then
+        return "None"
+    elseif #selected <= 3 then
+        return table.concat(selected, ", ")
+    else
+        return string.format("%s and %d more", table.concat({selected[1], selected[2]}, ", "), #selected - 2)
+    end
+end
+
+-- Auto equip shovel
+function Functions.autoEquipShovel()
+    if not player.Character then return end
+    local backpack = player:FindFirstChild("Backpack")
+    local shovel = backpack and backpack:FindFirstChild(shovelName)
+    if shovel then
+        shovel.Parent = player.Character
+    end
+end
+
+-- Get tree weight
+function Functions.getTreeWeight(treeName)
+    local tree = plantsPhysical:FindFirstChild(treeName)
+    if tree and tree:FindFirstChild("Weight") then
+        return tree.Weight.Value or 0
+    end
+    return 0
+end
+
+-- Get fruits from tree
+function Functions.getTreeFruits(treeName)
+    local fruits = {}
+    local tree = plantsPhysical:FindFirstChild(treeName)
+    if tree and tree:FindFirstChild("Fruit_Spawn") then
+        for _, fruit in ipairs(tree.Fruit_Spawn:GetChildren()) do
+            table.insert(fruits, fruit)
+        end
+    end
+    return fruits
+end
+
+-- Shovel fruit
+function Functions.shovelFruit(fruit)
+    if not fruit or not fruit.Parent or not shovelClient then return false end
+    
+    Functions.autoEquipShovel()
+    task.wait(0.1)
+    
+    local success, destroyEnv = pcall(function()
+        return getsenv and getsenv(shovelClient) or nil
+    end)
+    
+    if not success or not destroyEnv then return false end
+    
+    local shoveled = false
+    pcall(function()
+        if destroyEnv and destroyEnv.Destroy then
+            destroyEnv.Destroy(fruit)
+            shoveled = true
+        end
+    end)
+    
+    return shoveled
+end
+
+-- Auto shovel tree
+function Functions.autoShovelTree(treeName)
+    local treeWeight = Functions.getTreeWeight(treeName)
+    if treeWeight >= weightThreshold then return 0 end
+    
+    local fruits = Functions.getTreeFruits(treeName)
+    local shoveledCount = 0
+    
+    for _, fruit in ipairs(fruits) do
+        if Functions.shovelFruit(fruit) then
+            shoveledCount = shoveledCount + 1
+            task.wait(0.1)
+        end
+    end
+    
+    return shoveledCount
+end
+
+-- Auto shovel selected trees
+function Functions.autoShovelSelectedTrees()
+    local selected = Functions.getSelectedTrees()
+    if #selected == 0 then return 0 end
+    
+    local totalShoveled = 0
+    for _, treeName in ipairs(selected) do
+        totalShoveled = totalShoveled + Functions.autoShovelTree(treeName)
+        task.wait(0.2)
+    end
+    
+    return totalShoveled
+end
+
+-- Set weight threshold
+function Functions.setWeightThreshold(newThreshold, OrionLib)
+    if type(newThreshold) == "number" and newThreshold >= 0 then
+        weightThreshold = newThreshold
+        if OrionLib then
+            OrionLib:MakeNotification({
+                Name = "Weight Threshold Updated",
+                Content = string.format("New threshold: %d", weightThreshold),
+                Time = 3
+            })
+        end
+        return true
+    end
+    return false
+end
+
+-- Toggle auto shovel
+function Functions.toggleAutoShovel(OrionLib)
+    autoShovelEnabled = not autoShovelEnabled
+    
+    if autoShovelEnabled then
+        if autoShovelConnection then
+            autoShovelConnection:Disconnect()
+        end
+        autoShovelConnection = Functions.autoShovelSelectedLoop()
+        
+        if OrionLib then
+            OrionLib:MakeNotification({
+                Name = "Auto Shovel Enabled",
+                Content = string.format("Automatically shoveling fruits below %dkg...", weightThreshold),
+                Time = 3
+            })
+        end
+    else
+        if autoShovelConnection then
+            autoShovelConnection:Disconnect()
+            autoShovelConnection = nil
+        end
+        
+        if OrionLib then
+            OrionLib:MakeNotification({
+                Name = "Auto Shovel Disabled",
+                Content = "Auto shovel stopped",
+                Time = 3
+            })
+        end
+    end
+    
+    return autoShovelEnabled
+end
+
+-- Auto shovel loop
+function Functions.autoShovelSelectedLoop()
+    return RunService.Heartbeat:Connect(function()
+        if autoShovelEnabled and Functions.getSelectedTreesCount() > 0 then
+            Functions.autoShovelSelectedTrees()
+            task.wait(2)
+        end
+    end)
+end
+
 -- ===========AUTO MIDDLE PETS===============
 
 -- Function to reduce lag
