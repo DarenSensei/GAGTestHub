@@ -328,46 +328,74 @@ function Functions.autoShovelEquipShovel()
     end
 end
 
--- FIXED AUTO SHOVEL FUNCTIONS
+-- RECONSTRUCTED AUTO SHOVEL FUNCTIONS
+local RunService = game:GetService("RunService")
+
+-- Variables
+local selectedFruitTypes = {}
+local weightThreshold = 30
+local autoShovelEnabled = false
+local autoShovelConnection = nil
+
+-- Helper function to check if fruit should be shoveled
 local function shouldShovelFruit(fruit)
-    -- Check if the fruit object has a Weight property
-    if not fruit or not fruit:FindFirstChild("Weight") then 
+    if not fruit or not fruit.Parent then 
+        return false 
+    end
+    
+    -- Check if the fruit has a Weight property
+    local weightObject = fruit:FindFirstChild("Weight")
+    if not weightObject then 
         return false 
     end
     
     local success, weight = pcall(function()
-        return fruit.Weight.Value
+        return weightObject.Value
     end)
     
-    if not success then 
+    if not success or not weight then 
         return false 
     end
     
     return weight < weightThreshold
 end
 
+-- Function to shovel individual fruit (NOT the tree)
 local function shovelFruit(fruit)
-    -- Auto equip shovel first
-    Functions.autoEquipShovel()
-    task.wait(0.1) -- Small delay after equipping
-    
-    -- Check if the fruit still exists
     if not fruit or not fruit.Parent then 
-        return 
+        print("Fruit no longer exists, skipping")
+        return false
     end
     
-    -- Get the Remove_Item event directly using the confirmed path
+    print("Attempting to shovel fruit: " .. (fruit.Name or "Unknown"))
+    
+    -- Auto equip shovel first
+    if Functions.autoEquipShovel then
+        Functions.autoEquipShovel()
+        task.wait(0.1) -- Small delay after equipping
+    end
+    
+    -- Double check fruit still exists after delay
+    if not fruit or not fruit.Parent then 
+        print("Fruit disappeared after equipping shovel")
+        return false
+    end
+    
+    -- Get the Remove_Item event to remove ONLY the individual fruit
     local success, Remove_Item = pcall(function()
         return game:GetService("ReplicatedStorage").GameEvents.Remove_Item
     end)
     
     if success and Remove_Item then
-        -- Fire the event with the fruit object (as confirmed by Sigma Spy)
         local removeSuccess = pcall(function()
+            -- IMPORTANT: Only pass the individual fruit object, NOT the tree
             Remove_Item:FireServer(fruit)
+            print("Successfully sent remove request for fruit: " .. fruit.Name)
         end)
+        return removeSuccess
     else
-        -- Fallback method if the main path fails
+        print("Could not find Remove_Item event, trying fallback")
+        -- Fallback method
         local success2, gameEvents = pcall(function()
             return game:GetService("ReplicatedStorage"):FindFirstChild("GameEvents")
         end)
@@ -375,110 +403,194 @@ local function shovelFruit(fruit)
         if success2 and gameEvents then
             local altEvent = gameEvents:FindFirstChild("Remove_Item")
             if altEvent then
-                pcall(function()
+                local removeSuccess = pcall(function()
+                    -- Again, only pass the individual fruit
                     altEvent:FireServer(fruit)
+                    print("Successfully sent remove request via fallback for fruit: " .. fruit.Name)
                 end)
+                return removeSuccess
             end
         end
     end
+    
+    print("Failed to remove fruit: " .. fruit.Name)
+    return false
 end
 
--- FIXED: Added missing function declaration and proper end statement
+-- Group fruits by name to handle duplicates
+local function groupFruitsByName(fruitsFolder)
+    local groupedFruits = {}
+    
+    for _, fruit in pairs(fruitsFolder:GetChildren()) do
+        if fruit:FindFirstChild("Weight") then
+            local fruitName = fruit.Name
+            if not groupedFruits[fruitName] then
+                groupedFruits[fruitName] = {}
+            end
+            table.insert(groupedFruits[fruitName], fruit)
+        end
+    end
+    
+    return groupedFruits
+end
+
+-- Check if fruit type is selected
+local function isFruitTypeSelected(fruitName)
+    if #selectedFruitTypes == 0 then
+        return false
+    end
+    
+    for _, selectedType in ipairs(selectedFruitTypes) do
+        -- Exact match or partial match
+        if fruitName == selectedType or 
+           fruitName:find(selectedType) or 
+           selectedType:find(fruitName) then
+            return true
+        end
+    end
+    return false
+end
+
+-- Main auto shovel function
 local function autoShovel()
-    if not autoShovelEnabled then return end
+    if not autoShovelEnabled then 
+        return 
+    end
     
     if #selectedFruitTypes == 0 then
         return
     end
     
+    -- Get the plants physical folder (where all trees/plants are located)
     local success, plantsPhysical = pcall(function()
         return workspace.Farm.Farm.Important.Plants_Physical
     end)
     
     if not success or not plantsPhysical then 
+        print("Could not access Plants_Physical folder")
         return 
     end
     
-    -- Get ALL plants universally
-    local allPlants = plantsPhysical:GetChildren()
+    -- Get all trees/plants from Plants_Physical
+    local allTrees = plantsPhysical:GetChildren()
+    print("Found " .. #allTrees .. " trees/plants to check")
     
-    for _, plant in pairs(allPlants) do
-        -- Check if this plant has a Fruits folder
-        if plant:FindFirstChild("Fruits") then
-            local fruitsFolder = plant.Fruits
-            local allFruits = fruitsFolder:GetChildren()
+    -- Process each tree/plant
+    for treeIndex, tree in pairs(allTrees) do
+        if tree and tree.Parent then
+            print("Checking tree " .. treeIndex .. ": " .. (tree.Name or "Unknown"))
             
-            -- Process each individual fruit object
-            for _, individualFruit in pairs(allFruits) do
-                -- Check if this fruit type is selected for shoveling
-                local fruitSelected = false
-                for _, selectedType in ipairs(selectedFruitTypes) do
-                    if individualFruit.Name:find(selectedType) or selectedType:find(individualFruit.Name) then
-                        fruitSelected = true
-                        break
-                    end
-                end
+            -- Look for the Fruits folder inside this tree/plant
+            local fruitsFolder = tree:FindFirstChild("Fruits")
+            if fruitsFolder then
+                print("Found Fruits folder in tree " .. treeIndex)
                 
-                if fruitSelected then
-                    -- Only shovel the individual fruit if it meets criteria
-                    if individualFruit and individualFruit.Parent and shouldShovelFruit(individualFruit) then
-                        shovelFruit(individualFruit)
-                        task.wait(0.1) -- Small delay between shoveling each fruit
+                -- Get all individual fruits from this tree's Fruits folder
+                local allFruitsInTree = fruitsFolder:GetChildren()
+                print("Found " .. #allFruitsInTree .. " fruits in this tree")
+                
+                -- Group fruits by name to handle duplicates properly
+                local groupedFruits = groupFruitsByName(fruitsFolder)
+                
+                -- Process each fruit group
+                for fruitName, fruitGroup in pairs(groupedFruits) do
+                    print("Processing fruit group: " .. fruitName .. " (Count: " .. #fruitGroup .. ")")
+                    
+                    -- Check if this fruit type is selected for shoveling
+                    if isFruitTypeSelected(fruitName) then
+                        print("Fruit type " .. fruitName .. " is selected for shoveling")
+                        
+                        -- Process each individual fruit in the group
+                        for fruitIndex, individualFruit in pairs(fruitGroup) do
+                            if individualFruit and individualFruit.Parent then
+                                -- Check if this specific fruit meets weight criteria
+                                if shouldShovelFruit(individualFruit) then
+                                    print("Shoveling fruit " .. fruitIndex .. " of type " .. fruitName)
+                                    local success = shovelFruit(individualFruit)
+                                    if success then
+                                        task.wait(0.15) -- Small delay between shoveling each fruit
+                                    end
+                                else
+                                    print("Fruit " .. fruitIndex .. " does not meet weight criteria")
+                                end
+                            end
+                        end
+                    else
+                        print("Fruit type " .. fruitName .. " is not selected for shoveling")
                     end
                 end
+            else
+                print("No Fruits folder found in tree " .. treeIndex)
             end
         end
     end
 end
 
--- FIXED: Added missing Functions.autoShovel export
-Functions.autoShovel = autoShovel
-
--- FIXED: Added missing getFruitTypes function
+-- Get all available fruit types by checking all trees
 function Functions.getFruitTypes()
     local fruitTypes = {}
+    
+    -- Access the trees/plants folder
     local success, plantsPhysical = pcall(function()
         return workspace.Farm.Farm.Important.Plants_Physical
     end)
     
     if not success or not plantsPhysical then 
+        print("Could not access Plants_Physical for getting fruit types")
         return fruitTypes
     end
     
-    for _, plant in pairs(plantsPhysical:GetChildren()) do
-        if plant:FindFirstChild("Fruits") then
-            local fruitsFolder = plant.Fruits
-            for _, fruit in pairs(fruitsFolder:GetChildren()) do
-                if not table.find(fruitTypes, fruit.Name) then
+    -- Get all trees/plants
+    local allTrees = plantsPhysical:GetChildren()
+    print("Scanning " .. #allTrees .. " trees for fruit types")
+    
+    -- Collect unique fruit names from all trees
+    local uniqueFruits = {}
+    for treeIndex, tree in pairs(allTrees) do
+        if tree:FindFirstChild("Fruits") then
+            local fruitsFolder = tree.Fruits
+            local fruitsInTree = fruitsFolder:GetChildren()
+            
+            for _, fruit in pairs(fruitsInTree) do
+                -- Only include fruits that have a Weight property
+                if fruit:FindFirstChild("Weight") and not uniqueFruits[fruit.Name] then
+                    uniqueFruits[fruit.Name] = true
                     table.insert(fruitTypes, fruit.Name)
+                    print("Found fruit type: " .. fruit.Name .. " in tree " .. treeIndex)
                 end
             end
         end
     end
     
+    -- Sort alphabetically for better organization
+    table.sort(fruitTypes)
+    print("Total unique fruit types found: " .. #fruitTypes)
     return fruitTypes
 end
 
+-- Refresh fruit list for dropdown
 function Functions.refreshFruitList()
     local newOptions = {"None"}
-    for _, fruitType in ipairs(Functions.getFruitTypes()) do
+    local fruitTypes = Functions.getFruitTypes()
+    for _, fruitType in ipairs(fruitTypes) do
         table.insert(newOptions, fruitType)
     end
-    
-    -- Return options for manual dropdown update
     return newOptions
 end
 
+-- Clear selected fruits
 function Functions.clearSelectedFruits()
     selectedFruitTypes = {}
 end
 
+-- Add fruit to selection
 function Functions.addFruitToSelection(fruitName)
-    if not table.find(selectedFruitTypes, fruitName) then
+    if fruitName and fruitName ~= "None" and not table.find(selectedFruitTypes, fruitName) then
         table.insert(selectedFruitTypes, fruitName)
     end
 end
 
+-- Set weight threshold
 function Functions.setFruitWeightThreshold(weight)
     local num = tonumber(weight)
     if num and num >= 0 and num <= 500 then
@@ -488,22 +600,45 @@ function Functions.setFruitWeightThreshold(weight)
     return false
 end
 
+-- Set selected fruits array
 function Functions.setSelectedFruits(fruitArray)
     selectedFruitTypes = fruitArray or {}
 end
 
+-- Get selected fruits
 function Functions.getSelectedFruits()
     return selectedFruitTypes
 end
 
+-- Get selected fruits count
+function Functions.getSelectedFruitsCount()
+    return #selectedFruitTypes
+end
+
+-- Get selected fruits as string
+function Functions.getSelectedFruitsString()
+    if #selectedFruitTypes == 0 then
+        return "None"
+    end
+    return table.concat(selectedFruitTypes, ", ")
+end
+
+-- Toggle auto shovel
 function Functions.toggleAutoShovel(enabled, OrionLib)
     autoShovelEnabled = enabled
     
     if enabled then
-        if autoShovelConnection then autoShovelConnection:Disconnect() end
+        -- Disconnect existing connection
+        if autoShovelConnection then 
+            autoShovelConnection:Disconnect() 
+        end
+        
+        -- Create new connection with proper error handling
         autoShovelConnection = RunService.Heartbeat:Connect(function()
             if autoShovelEnabled then
-                Functions.autoShovel()
+                pcall(function()
+                    autoShovel()
+                end)
                 task.wait(1) -- Check every second
             end
         end)
@@ -511,15 +646,34 @@ function Functions.toggleAutoShovel(enabled, OrionLib)
         if OrionLib then
             OrionLib:MakeNotification({
                 Name = "Auto Shovel",
-                Content = "Auto Shovel enabled",
+                Content = "Auto Shovel enabled for " .. Functions.getSelectedFruitsCount() .. " fruit types",
                 Time = 2
             })
         end
     else
+        -- Disable auto shovel
         if autoShovelConnection then
             autoShovelConnection:Disconnect()
             autoShovelConnection = nil
         end
+        
+        if OrionLib then
+            OrionLib:MakeNotification({
+                Name = "Auto Shovel",
+                Content = "Auto Shovel disabled",
+                Time = 2
+            })
+        end
+    end
+end
+
+-- Export the main auto shovel function
+Functions.autoShovel = autoShovel
+
+-- Export variables for external access
+Functions.selectedFruitTypes = selectedFruitTypes
+Functions.weightThreshold = weightThreshold
+Functions.autoShovelEnabled = autoShovelEnabled
         
         if OrionLib then
             OrionLib:MakeNotification({
