@@ -460,7 +460,7 @@ local cropDropdown = Tab:AddDropdown({
             end
             if not hasNone then
                 for _, cropName in pairs(selectedValues) do
-                    CoreFunctions.addCropToSelection(cropName)  -- Changed from Functions to CoreFunctions
+                    CoreFunctions.addTreeToSelection(cropName)  -- Changed from Functions to CoreFunctions
                 end
             end
         end
@@ -473,7 +473,7 @@ Tab:AddTextbox({
     Default = "1",
     TextDisappear = false,
     Callback = function(value)
-        CoreFunctions.setCropWeightThreshold(value)  -- Changed from Functions to CoreFunctions
+        CoreFunctions.setTreeWeightThreshold(value)  -- Changed from Functions to CoreFunctions
     end
 })
 
@@ -481,7 +481,7 @@ Tab:AddTextbox({
 Tab:AddButton({
     Name = "Refresh Crop List",
     Callback = function()
-        local options = CoreFunctions.refreshCropList()  -- Changed from Functions to CoreFunctions
+        local options = CoreFunctions.Functions.refreshTreeList()  -- Changed from Functions to CoreFunctions
         cropDropdown:Refresh(options, true)
     end
 })
@@ -491,7 +491,7 @@ Tab:AddToggle({
     Name = "Auto Shovel Crops",
     Default = false,
     Callback = function(value)
-        CoreFunctions.toggleAutoShovelCrops(value, OrionLib)  -- Changed from Functions to CoreFunctions
+        CoreFunctions.toggleAutoShovelTrees(value, OrionLib)  -- Changed from Functions to CoreFunctions
     end
 })
 
