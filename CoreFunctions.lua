@@ -59,6 +59,12 @@ local allPetsSelected = false
 local petsFolder = nil
 local currentPetsList = {}
 
+-- Auto Shovel Variables (FIXED: Added missing declarations)
+local selectedFruitTypes = {}
+local weightThreshold = 50
+local autoShovelEnabled = false
+local autoShovelConnection = nil
+
 -- Auto-buy states
 local autoBuyZenEnabled = false
 local autoBuyMerchantEnabled = false
@@ -325,7 +331,7 @@ end
 -- FIXED AUTO SHOVEL FUNCTIONS
 local function shouldShovelFruit(fruit)
     -- Check if the fruit object has a Weight property
-    if not fruit:FindFirstChild("Weight") then 
+    if not fruit or not fruit:FindFirstChild("Weight") then 
         return false 
     end
     
@@ -342,10 +348,8 @@ end
 
 local function shovelFruit(fruit)
     -- Auto equip shovel first
-    if CoreFunctions and CoreFunctions.autoEquipShovel then
-        CoreFunctions.autoEquipShovel()
-        task.wait(0.1) -- Small delay after equipping
-    end
+    Functions.autoEquipShovel()
+    task.wait(0.1) -- Small delay after equipping
     
     -- Check if the fruit still exists
     if not fruit or not fruit.Parent then 
@@ -379,6 +383,7 @@ local function shovelFruit(fruit)
     end
 end
 
+-- FIXED: Added missing function declaration and proper end statement
 local function autoShovel()
     if not autoShovelEnabled then return end
     
@@ -424,7 +429,37 @@ local function autoShovel()
             end
         end
     end
-endfunction Functions.refreshFruitList()
+end
+
+-- FIXED: Added missing Functions.autoShovel export
+Functions.autoShovel = autoShovel
+
+-- FIXED: Added missing getFruitTypes function
+function Functions.getFruitTypes()
+    local fruitTypes = {}
+    local success, plantsPhysical = pcall(function()
+        return workspace.Farm.Farm.Important.Plants_Physical
+    end)
+    
+    if not success or not plantsPhysical then 
+        return fruitTypes
+    end
+    
+    for _, plant in pairs(plantsPhysical:GetChildren()) do
+        if plant:FindFirstChild("Fruits") then
+            local fruitsFolder = plant.Fruits
+            for _, fruit in pairs(fruitsFolder:GetChildren()) do
+                if not table.find(fruitTypes, fruit.Name) then
+                    table.insert(fruitTypes, fruit.Name)
+                end
+            end
+        end
+    end
+    
+    return fruitTypes
+end
+
+function Functions.refreshFruitList()
     local newOptions = {"None"}
     for _, fruitType in ipairs(Functions.getFruitTypes()) do
         table.insert(newOptions, fruitType)
@@ -500,21 +535,6 @@ end
 Functions.selectedFruitTypes = selectedFruitTypes
 Functions.weightThreshold = weightThreshold
 Functions.autoShovelEnabled = autoShovelEnabled
-
--- Cleanup function update
-local originalCleanup = Functions.cleanup
-function Functions.cleanup()
-    -- Call original cleanup
-    if originalCleanup then
-        originalCleanup()
-    end
-    
-    -- Clean up auto shovel connection
-    if autoShovelConnection then
-        autoShovelConnection:Disconnect()
-        autoShovelConnection = nil
-    end
-end
 
 -- Remove Farms function
 function Functions.removeFarms(OrionLib)
@@ -633,6 +653,12 @@ function Functions.cleanup()
     if merchantBuyConnection then
         merchantBuyConnection:Disconnect()
         merchantBuyConnection = nil
+    end
+    
+    -- Clean up auto shovel connection
+    if autoShovelConnection then
+        autoShovelConnection:Disconnect()
+        autoShovelConnection = nil
     end
     
     -- Clean up ESP markers
