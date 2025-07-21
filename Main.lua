@@ -463,30 +463,6 @@ Tab:AddButton({
 
 Tab:AddSection({Name = "-PET EXPLOIT-"})
 
--- FIXED: Pet count label initialization
-petCountLabel = Tab:AddLabel("Pets Found: 0 | Selected: 0 | Excluded: 0")
-
--- Set up PetFunctions reference safely
-if PetFunctions and PetFunctions.setPetCountLabel then
-    pcall(function()
-        PetFunctions.setPetCountLabel(petCountLabel)
-    end)
-end
-
--- Initial update and start monitoring loop
-updatePetCount()
-
--- FIXED: Pet count monitoring with better error handling
-task.spawn(function()
-    while true do
-        local success = pcall(updatePetCount)
-        if not success then
-            warn("Pet count update failed, retrying...")
-        end
-        task.wait(2) -- Increased interval to reduce spam
-    end
-end)
-
 -- Pet exclusion dropdown
 petDropdown = Tab:AddDropdown({
     Name = "Select Pets to Exclude",
@@ -531,8 +507,6 @@ petDropdown = Tab:AddDropdown({
                 PetFunctions.setExcludedPets(excludedPets)
             end
             
-            updatePetCount()
-            
             local excludedCount = 0
             for _ in pairs(excludedPets) do
                 excludedCount = excludedCount + 1
@@ -566,7 +540,6 @@ Tab:AddButton({
     Callback = function()
         local newPets = refreshPets()
         selectAllPets()
-        updatePetCount()
         
         if petDropdown and petDropdown.ClearAll then
             pcall(function()
