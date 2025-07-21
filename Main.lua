@@ -25,7 +25,7 @@ end
 
 -- Load external functions with error handling
 local CoreFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/CoreFunctions.lua", "CoreFunctions")
-local PetFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/PetMiddleFunctions.lua", "PetFunctions")
+local PetFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/PetMiddleFunctions.lua", "PetFunctions")
 local OrionLib = safeLoad("https://raw.githubusercontent.com/YuraScripts/GrowAFilipinoy/refs/heads/main/TEST.lua", "OrionLib")
 local AutoBuy = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/AutoBuy.lua", "AutoBuy")
 
@@ -55,7 +55,6 @@ local excludedPetESPs = {}
 local allPetsSelected = false
 local autoMiddleEnabled = false
 local currentPetsList = {}
-local petCountLabel = nil
 local petDropdown = nil
 local cropDropdown = nil
 
@@ -75,7 +74,7 @@ local buyConnection = nil
 
 -- Create Orion UI
 local Window = OrionLib:MakeWindow({
-    Name = "GAGSL Hub (v1.2)",
+    Name = "GAGSL Hub (v1.2.1)",
     HidePremium = false,
     IntroText = "Grow A Garden Script Loader",
     SaveConfig = false
@@ -161,65 +160,8 @@ local function getSelectedSprinklersString()
     return safeCall(CoreFunctions.getSelectedSprinklersString, "getSelectedSprinklersString") or table.concat(selectedSprinklers, ", ")
 end
 
--- FIXED: Pet helper functions with better error handling
 local function refreshPets()
     return safeCall(PetFunctions.refreshPets, "refreshPets") or {}
-end
-
-local function updatePetCount()
-    -- Use a safer approach that doesn't rely on external functions that might fail
-    local success, error = pcall(function()
-        if not petCountLabel then
-            return
-        end
-        
-        -- Get counts safely
-        local totalPets = 0
-        local selectedCount = 0
-        local excludedCount = 0
-        
-        -- Count total pets
-        if currentPetsList then
-            for _, _ in pairs(currentPetsList) do
-                totalPets = totalPets + 1
-            end
-        end
-        
-        -- Count selected pets
-        if selectedPets then
-            for _, _ in pairs(selectedPets) do
-                selectedCount = selectedCount + 1
-            end
-        end
-        
-        -- Count excluded pets
-        if excludedPets then
-            for _, _ in pairs(excludedPets) do
-                excludedCount = excludedCount + 1
-            end
-        end
-        
-        -- Update label safely
-        if petCountLabel and petCountLabel.Set then
-            petCountLabel:Set(string.format("Pets Found: %d | Selected: %d | Excluded: %d", 
-                totalPets, selectedCount, excludedCount))
-        elseif petCountLabel then
-            -- Fallback if Set method doesn't exist
-            local labelText = string.format("Pets Found: %d | Selected: %d | Excluded: %d", 
-                totalPets, selectedCount, excludedCount)
-            
-            -- Try different ways to update the label
-            if petCountLabel.Text then
-                petCountLabel.Text = labelText
-            elseif petCountLabel.Label then
-                petCountLabel.Label = labelText
-            end
-        end
-    end)
-    
-    if not success then
-        warn("Error updating pet count: " .. tostring(error))
-    end
 end
 
 local function selectAllPets()
@@ -433,11 +375,6 @@ Tab:AddToggle({
             })
         else
             clearSelectedSprinklers()
-            OrionLib:MakeNotification({
-                Name = "Selection Cleared",
-                Content = "All selections cleared",
-                Time = 2
-            })
         end
     end
 })
@@ -506,24 +443,7 @@ petDropdown = Tab:AddDropdown({
             if PetFunctions and PetFunctions.setExcludedPets then
                 PetFunctions.setExcludedPets(excludedPets)
             end
-            
-            local excludedCount = 0
-            for _ in pairs(excludedPets) do
-                excludedCount = excludedCount + 1
-            end
-            
-            if excludedCount > 0 then
-                OrionLib:MakeNotification({
-                    Name = "Pets Excluded",
-                    Content = "Excluded " .. excludedCount .. " pets from auto middle.",
-                    Time = 2
-                })
-            end
         end)
-        
-        if not success then
-            warn("Error in pet exclusion callback: " .. tostring(error))
-        end
     end
 })
 
@@ -574,7 +494,6 @@ Tab:AddToggle({
         end
     end
 })
-
 
 Tab:AddSection({Name = "AUTO SHOVEL"})
 
@@ -666,50 +585,137 @@ Tab:AddToggle({
 -- SHOP TAB
 local ShopTab = Window:MakeTab({
     Name = "Shop",
-    Icon = "rbxassetid://4835310745",
+    Icon = "rbxassetid://6031280882",
     PremiumOnly = false
 })
 
--- Auto buy zen
+ShopTab:AddParagraph("Auto Buy", "Auto Buy, Buy even AFK")
+
+ShopTab:AddSection({
+    Name = "-Auto Buy Zen-"
+})
+
+-- Zen Items Multi-Select Dropdown
+local zenOptions = {"None"}
+for _, item in pairs(AutoBuy.zenItems) do
+    table.insert(zenOptions, item)
+end
+
+ShopTab:AddDropdown({
+    Name = "Select Zen Items to Auto Buy",
+    Default = {},
+    Options = zenOptions,
+    Callback = function(selectedValues)
+        local success, error = pcall(function()
+            local newSelectedItems = {}
+            
+            if selectedValues and #selectedValues > 0 then
+                local hasNone = false
+                for _, value in pairs(selectedValues) do
+                    if value == "None" then
+                        hasNone = true
+                        break
+                    end
+                end
+                
+                if not hasNone then
+                    for _, itemName in pairs(selectedValues) do
+                        table.insert(newSelectedItems, itemName)
+                    end
+                end
+            end
+            
+            AutoBuy.setSelectedZenItems(newSelectedItems)
+            print("Selected Zen Items:", table.concat(newSelectedItems, ", "))
+        end)
+        
+        if not success then
+            warn("Error updating zen items selection:", error)
+        end
+    end
+})
+
 ShopTab:AddToggle({
-    Name = "Auto Buy Zen",
+    Name = "Enable Zen Auto Buy",
     Default = false,
     Callback = function(Value)
-        safeCall(CoreFunctions.toggleAutoBuyZen, "toggleAutoBuyZen", Value)
-        
+        AutoBuy.toggleAutoBuyZen(Value)
         if Value then
             OrionLib:MakeNotification({
                 Name = "Auto Buy Zen",
-                Content = "Auto Buy Zen enabled!",
-                Time = 2
+                Content = "Zen auto buy enabled!",
+                Image = "rbxassetid://4483345998",
+                Time = 3
             })
         end
-    end    
+    end
 })
 
--- Auto buy merchant
+-- ===========================================
+-- MERCHANT SHOP TAB
+-- ===========================================
+
+ShopTab:AddSection({
+    Name = "-Traveling Merchant-"
+})
+
+-- Merchant Items Multi-Select Dropdown
+local merchantOptions = {"None"}
+for _, item in pairs(AutoBuy.merchantItems) do
+    table.insert(merchantOptions, item)
+end
+
+ShopTab:AddDropdown({
+    Name = "Select Merchant Items to Auto Buy",
+    Default = {},
+    Options = merchantOptions,
+    Callback = function(selectedValues)
+        local success, error = pcall(function()
+            local newSelectedItems = {}
+            
+            if selectedValues and #selectedValues > 0 then
+                local hasNone = false
+                for _, value in pairs(selectedValues) do
+                    if value == "None" then
+                        hasNone = true
+                        break
+                    end
+                end
+                
+                if not hasNone then
+                    for _, itemName in pairs(selectedValues) do
+                        table.insert(newSelectedItems, itemName)
+                    end
+                end
+            end
+            
+            AutoBuy.setSelectedMerchantItems(newSelectedItems)
+        end)
+    end
+})
+
 ShopTab:AddToggle({
-    Name = "Auto Buy Traveling Merchants",
+    Name = "Auto Buy Merchant",
     Default = false,
     Callback = function(Value)
-        safeCall(CoreFunctions.toggleAutoBuyMerchant, "toggleAutoBuyMerchant", Value)
-        
+        AutoBuy.toggleAutoBuyMerchant(Value)
         if Value then
             OrionLib:MakeNotification({
-                Name = "Auto Buy Traveling Merchant",
-                Content = "Auto Buy Traveling Merchant enabled!",
-                Time = 2
+                Name = "Auto Buy Merchant",
+                Content = "Merchant auto buy enabled!",
+                Image = "rbxassetid://4483345998",
+                Time = 3
             })
         end
-    end    
+    end
 })
 
 -- ========================================
 -- EGG SECTION
 -- ========================================
-
+ShopTab:AddSection({Name = "-Egg-"})
 -- Egg Dropdown
-local eggDropdown = Tab:AddDropdown({
+local eggDropdown = ShopTab:AddDropdown({
     Name = "Select Eggs",
     Default = {},
     Options = AutoBuy.eggOptions,
@@ -719,7 +725,7 @@ local eggDropdown = Tab:AddDropdown({
 })
 
 -- Auto Buy Egg Toggle
-local autoBuyEggToggle = Tab:AddToggle({
+local autoBuyEggToggle = ShopTab:AddToggle({
     Name = "Auto Buy Egg",
     Default = false,
     Callback = function(value)
@@ -731,12 +737,6 @@ local autoBuyEggToggle = Tab:AddToggle({
                 Content = "Auto Buy Egg enabled!",
                 Time = 2
             })
-        else
-            OrionLib:MakeNotification({
-                Name = "Auto Buy Egg",
-                Content = "Auto Buy Egg disabled!",
-                Time = 2
-            })
         end
     end
 })
@@ -744,9 +744,9 @@ local autoBuyEggToggle = Tab:AddToggle({
 -- ========================================
 -- SEED SECTION
 -- ========================================
-
+ShopTab:AddSection({Name = "-Seed-"})
 -- Seed Dropdown
-local seedDropdown = Tab:AddDropdown({
+local seedDropdown = ShopTab:AddDropdown({
     Name = "Select Seeds to Auto Buy",
     Default = {},
     Options = AutoBuy.seedOptions,
@@ -756,7 +756,7 @@ local seedDropdown = Tab:AddDropdown({
 })
 
 -- Auto Buy Seed Toggle
-local autoBuySeedToggle = Tab:AddToggle({
+local autoBuySeedToggle = ShopTab:AddToggle({
     Name = "Auto Buy Seed",
     Default = false,
     Callback = function(value)
@@ -768,12 +768,6 @@ local autoBuySeedToggle = Tab:AddToggle({
                 Content = "Auto Buy Seed enabled!",
                 Time = 2
             })
-        else
-            OrionLib:MakeNotification({
-                Name = "Auto Buy Seed",
-                Content = "Auto Buy Seed disabled!",
-                Time = 2
-            })
         end
     end
 })
@@ -781,18 +775,19 @@ local autoBuySeedToggle = Tab:AddToggle({
 -- ========================================
 -- GEAR SECTION
 -- ========================================
-
+ShopTab:AddSection({Name = "-Gears-"})
 -- Gear Dropdown
-local gearDropdown = Tab:AddDropdown({
+local gearDropdown = ShopTab:AddDropdown({
     Name = "Select Gear to Auto Buy",
     Default = {},
     Options = AutoBuy.gearOptions,
     Callback = function(selectedValues)
         local selectedCount = AutoBuy.setSelectedGear(selectedValues)
+    end
 })
 
 -- Auto Buy Gear Toggle
-local autoBuyGearToggle = Tab:AddToggle({
+local autoBuyGearToggle = ShopTab:AddToggle({
     Name = "Auto Buy Gear",
     Default = false,
     Callback = function(value)
@@ -804,15 +799,11 @@ local autoBuyGearToggle = Tab:AddToggle({
                 Content = "Auto Buy Gear enabled!",
                 Time = 2
             })
-        else
-            OrionLib:MakeNotification({
-                Name = "Auto Buy Gear",
-                Content = "Auto Buy Gear disabled!",
-                Time = 2
-            })
         end
     end
 })
+
+AutoBuy.startLoop()
 
 -- MISC TAB
 local MiscTab = Window:MakeTab({
