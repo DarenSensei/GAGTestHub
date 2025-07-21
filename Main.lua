@@ -1,4 +1,4 @@
--- Main GAGSL Hub Script (FIXED & OPTIMIZED)
+-- Main GAGSL Hub Script (FIXED UI ERRORS)
 repeat task.wait() until game:IsLoaded()
 
 -- Safe loading function with error handling
@@ -80,11 +80,18 @@ local Window = OrionLib:MakeWindow({
     SaveConfig = false
 })
 
--- Fade in animation
+-- Fade in animation with better error handling
 local function fadeInMainTab()
     local success, error = pcall(function()
-        local screenGui = player:WaitForChild("PlayerGui"):WaitForChild("Orion")
-        local mainFrame = screenGui:WaitForChild("Main")
+        local playerGui = player:WaitForChild("PlayerGui", 5)
+        if not playerGui then return end
+        
+        local orionGui = playerGui:WaitForChild("Orion", 5)
+        if not orionGui then return end
+        
+        local mainFrame = orionGui:WaitForChild("Main", 5)
+        if not mainFrame then return end
+        
         mainFrame.BackgroundTransparency = 1
 
         local tween = TweenService:Create(
@@ -153,13 +160,65 @@ local function getSelectedSprinklersString()
     return safeCall(CoreFunctions.getSelectedSprinklersString, "getSelectedSprinklersString") or table.concat(selectedSprinklers, ", ")
 end
 
--- Pet helper functions
+-- FIXED: Pet helper functions with better error handling
 local function refreshPets()
     return safeCall(PetFunctions.refreshPets, "refreshPets") or {}
 end
 
 local function updatePetCount()
-    safeCall(PetFunctions.updatePetCount, "updatePetCount")
+    -- Use a safer approach that doesn't rely on external functions that might fail
+    local success, error = pcall(function()
+        if not petCountLabel then
+            return
+        end
+        
+        -- Get counts safely
+        local totalPets = 0
+        local selectedCount = 0
+        local excludedCount = 0
+        
+        -- Count total pets
+        if currentPetsList then
+            for _, _ in pairs(currentPetsList) do
+                totalPets = totalPets + 1
+            end
+        end
+        
+        -- Count selected pets
+        if selectedPets then
+            for _, _ in pairs(selectedPets) do
+                selectedCount = selectedCount + 1
+            end
+        end
+        
+        -- Count excluded pets
+        if excludedPets then
+            for _, _ in pairs(excludedPets) do
+                excludedCount = excludedCount + 1
+            end
+        end
+        
+        -- Update label safely
+        if petCountLabel and petCountLabel.Set then
+            petCountLabel:Set(string.format("Pets Found: %d | Selected: %d | Excluded: %d", 
+                totalPets, selectedCount, excludedCount))
+        elseif petCountLabel then
+            -- Fallback if Set method doesn't exist
+            local labelText = string.format("Pets Found: %d | Selected: %d | Excluded: %d", 
+                totalPets, selectedCount, excludedCount)
+            
+            -- Try different ways to update the label
+            if petCountLabel.Text then
+                petCountLabel.Text = labelText
+            elseif petCountLabel.Label then
+                petCountLabel.Label = labelText
+            end
+        end
+    end)
+    
+    if not success then
+        warn("Error updating pet count: " .. tostring(error))
+    end
 end
 
 local function selectAllPets()
@@ -403,16 +462,27 @@ Tab:AddButton({
 
 Tab:AddSection({Name = "-PET EXPLOIT-"})
 
+-- FIXED: Pet count label initialization
 petCountLabel = Tab:AddLabel("Pets Found: 0 | Selected: 0 | Excluded: 0")
+
+-- Set up PetFunctions reference safely
 if PetFunctions and PetFunctions.setPetCountLabel then
-    PetFunctions.setPetCountLabel(petCountLabel)
+    pcall(function()
+        PetFunctions.setPetCountLabel(petCountLabel)
+    end)
 end
 
+-- Initial update and start monitoring loop
 updatePetCount()
+
+-- FIXED: Pet count monitoring with better error handling
 task.spawn(function()
     while true do
-        updatePetCount()
-        task.wait(1)
+        local success = pcall(updatePetCount)
+        if not success then
+            warn("Pet count update failed, retrying...")
+        end
+        task.wait(2) -- Increased interval to reduce spam
     end
 end)
 
@@ -422,58 +492,71 @@ petDropdown = Tab:AddDropdown({
     Default = {},
     Options = {"None"},
     Callback = function(selectedValues)
-        if PetFunctions then
-            excludedPets = safeCall(PetFunctions.getExcludedPets, "getExcludedPets") or {}
-            currentPetsList = safeCall(PetFunctions.getCurrentPetsList, "getCurrentPetsList") or {}
-        end
-        
-        for petId, _ in pairs(excludedPets) do
-            removeESPMarker(petId)
-        end
-        excludedPets = {}
-        
-        if selectedValues and #selectedValues > 0 then
-            local hasNone = false
-            for _, value in pairs(selectedValues) do
-                if value == "None" then
-                    hasNone = true
-                    break
-                end
+        -- Safely get current data
+        local success, error = pcall(function()
+            if PetFunctions then
+                excludedPets = safeCall(PetFunctions.getExcludedPets, "getExcludedPets") or {}
+                currentPetsList = safeCall(PetFunctions.getCurrentPetsList, "getCurrentPetsList") or {}
             end
             
-            if not hasNone then
-                for _, petName in pairs(selectedValues) do
-                    local selectedPet = currentPetsList[petName]
-                    if selectedPet then
-                        excludedPets[selectedPet.id] = true
-                        createESPMarker(selectedPet)
+            -- Clear existing ESP markers
+            for petId, _ in pairs(excludedPets) do
+                removeESPMarker(petId)
+            end
+            excludedPets = {}
+            
+            if selectedValues and #selectedValues > 0 then
+                local hasNone = false
+                for _, value in pairs(selectedValues) do
+                    if value == "None" then
+                        hasNone = true
+                        break
+                    end
+                end
+                
+                if not hasNone then
+                    for _, petName in pairs(selectedValues) do
+                        local selectedPet = currentPetsList[petName]
+                        if selectedPet then
+                            excludedPets[selectedPet.id] = true
+                            createESPMarker(selectedPet)
+                        end
                     end
                 end
             end
-        end
+            
+            -- Update PetFunctions
+            if PetFunctions and PetFunctions.setExcludedPets then
+                PetFunctions.setExcludedPets(excludedPets)
+            end
+            
+            updatePetCount()
+            
+            local excludedCount = 0
+            for _ in pairs(excludedPets) do
+                excludedCount = excludedCount + 1
+            end
+            
+            if excludedCount > 0 then
+                OrionLib:MakeNotification({
+                    Name = "Pets Excluded",
+                    Content = "Excluded " .. excludedCount .. " pets from auto middle.",
+                    Time = 2
+                })
+            end
+        end)
         
-        if PetFunctions and PetFunctions.setExcludedPets then
-            PetFunctions.setExcludedPets(excludedPets)
-        end
-        updatePetCount()
-        
-        local excludedCount = 0
-        for _ in pairs(excludedPets) do
-            excludedCount = excludedCount + 1
-        end
-        
-        if excludedCount > 0 then
-            OrionLib:MakeNotification({
-                Name = "Pets Excluded",
-                Content = "Excluded " .. excludedCount .. " pets from auto middle.",
-                Time = 2
-            })
+        if not success then
+            warn("Error in pet exclusion callback: " .. tostring(error))
         end
     end
 })
 
+-- Set up dropdown reference safely
 if PetFunctions and PetFunctions.setPetDropdown then
-    PetFunctions.setPetDropdown(petDropdown)
+    pcall(function()
+        PetFunctions.setPetDropdown(petDropdown)
+    end)
 end
 
 -- Refresh and select all pets
@@ -484,8 +567,10 @@ Tab:AddButton({
         selectAllPets()
         updatePetCount()
         
-        if petDropdown then
-            petDropdown:ClearAll()
+        if petDropdown and petDropdown.ClearAll then
+            pcall(function()
+                petDropdown:ClearAll()
+            end)
         end
         
         OrionLib:MakeNotification({
@@ -503,7 +588,9 @@ Tab:AddToggle({
     Callback = function(value)
         autoMiddleEnabled = value
         if PetFunctions and PetFunctions.setAutoMiddleEnabled then
-            PetFunctions.setAutoMiddleEnabled(value)
+            pcall(function()
+                PetFunctions.setAutoMiddleEnabled(value)
+            end)
         end
         if value then
             setupZoneAbilityListener()
@@ -548,7 +635,9 @@ Tab:AddButton({
     Callback = function()
         local newCropTypes = safeCall(CoreFunctions.getCropTypes, "getCropTypes") or {"All Plants"}
         if cropDropdown and cropDropdown.Refresh then
-            cropDropdown:Refresh(newCropTypes, true)
+            pcall(function()
+                cropDropdown:Refresh(newCropTypes, true)
+            end)
         end
         
         OrionLib:MakeNotification({
