@@ -533,6 +533,7 @@ if PetFunctions and PetFunctions.setPetDropdown then
         PetFunctions.setPetDropdown(petDropdown)
     end)
 end
+})
 
 -- Refresh and select all pets
 Tab:AddButton({
