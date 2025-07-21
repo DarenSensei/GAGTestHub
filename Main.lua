@@ -516,8 +516,7 @@ Tab:AddToggle({
 
 Tab:AddSection({Name = "AUTO SHOVEL"})
 
-Tab:AddParagraph("Auto Shovel Crops", "Automatically shovel crops based on weight threshold.")
-cropDropdown = AutoShovelTab:AddDropdown({
+cropDropdown = Tab:AddDropdown({
     Name = "Select Crops to Monitor",
     Default = {"All Plants"},
     Options = safeCall(CoreFunctions.getCropTypes, "getCropTypes") or {"All Plants"},
@@ -584,6 +583,7 @@ Tab:AddTextbox({
         end
     end
 })
+
 Tab:AddToggle({
     Name = "Enable Auto Shovel",
     Default = safeCall(CoreFunctions.getAutoShovelStatus, "getAutoShovelStatus") or false,
