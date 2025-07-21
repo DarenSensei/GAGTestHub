@@ -234,7 +234,7 @@ end
 function AutoBuy.startLoop()
     spawn(function()
         while true do
-            wait(5) -- 5 second interval
+            wait(0.5) -- 5 second interval
             AutoBuy.run()
         end
     end)
