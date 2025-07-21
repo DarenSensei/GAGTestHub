@@ -309,8 +309,7 @@ local Tab = Window:MakeTab({
     PremiumOnly = false
 })
 
--- Sprinkler Section
-Tab:AddParagraph("Shovel Sprinkler", "Inf. Sprinkler Glitch")
+Tab:AddSection({Name = "INF. Sprinkler"})
 
 -- Sprinkler dropdown
 local sprinklerDropdown = Tab:AddDropdown({
@@ -402,8 +401,7 @@ Tab:AddButton({
     end
 })
 
--- Pet Section
-Tab:AddParagraph("Pet Exploit", "Auto Middle Pets, Select Pet to Exclude.")
+Tab:AddSection({Name = "-PET EXPLOIT-"})
 
 petCountLabel = Tab:AddLabel("Pets Found: 0 | Selected: 0 | Excluded: 0")
 if PetFunctions and PetFunctions.setPetCountLabel then
