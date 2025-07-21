@@ -10,7 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 -- Pet Radius Control Configuration
-local RADIUS = 0.5
+local RADIUS = 0.1
 local LOOP_DELAY = 1
 local INITIAL_LOOP_TIME = 5
 local ZONE_ABILITY_DELAY = 3
@@ -35,7 +35,6 @@ local notificationConnection = nil
 local loopTimer = nil
 local delayTimer = nil
 local isLooping = false
-local petCountLabel = nil
 local petDropdown = nil
 local currentPetsList = {}
 local lastZoneAbilityTime = 0 -- Track last zone ability time
@@ -401,8 +400,7 @@ function PetFunctions.selectAllPets()
     for _, pet in pairs(pets) do
         selectedPets[pet.id] = true
     end
-end
-
+    
 -- Function to update dropdown options
 function PetFunctions.updateDropdownOptions()
     local pets = PetFunctions.getAllPets()
@@ -432,50 +430,61 @@ function PetFunctions.refreshPets()
     return pets
 end
 
--- Function to update pet count
-function PetFunctions.updatePetCount()
-    local pets = PetFunctions.getAllPets()
-    local selectedCount = 0
-    local excludedCount = 0
-    
-    for petId, _ in pairs(selectedPets) do
-        selectedCount = selectedCount + 1
-    end
-    
-    for petId, _ in pairs(excludedPets) do
-        excludedCount = excludedCount + 1
-    end
-    
-    if allPetsSelected then
-        selectedCount = #pets
-    end
-    
-    if petCountLabel then
-        petCountLabel:Set("Pets Found: " .. #pets .. " | Selected: " .. selectedCount .. " | Excluded: " .. excludedCount)
-    end
+-- Helper functions for managing pet selection state
+function PetFunctions.getSelectedPets()
+    return selectedPets or {}
 end
 
--- Helper functions for external use
+function PetFunctions.getExcludedPets()
+    return excludedPets or {}
+end
+
+function PetFunctions.getAllPetsSelected()
+    return allPetsSelected or false
+end
+
+-- Additional helper function to select individual pets
+function PetFunctions.selectPet(petId)
+    if not selectedPets then
+        selectedPets = {}
+    end
+    selectedPets[petId] = true
+    allPetsSelected = false -- Individual selection means not all are selected
+end
+
+-- Function to deselect individual pets
+function PetFunctions.deselectPet(petId)
+    if selectedPets then
+        selectedPets[petId] = nil
+    end
+    allPetsSelected = false
+end
+
+-- Function to exclude pets
+function PetFunctions.excludePet(petId)
+    if not excludedPets then
+        excludedPets = {}
+    end
+    excludedPets[petId] = true
+    -- Remove from selected if it was selected
+    if selectedPets then
+        selectedPets[petId] = nil
+    end
+
+-- Helper functions for managing pet exclusions
 function PetFunctions.isPetExcluded(petId)
-    return excludedPets[petId] == true
-end
-
-function PetFunctions.getExcludedPetCount()
-    local count = 0
-    for _ in pairs(excludedPets) do
-        count = count + 1
-    end
-    return count
+    local mainExcludedPets = excludedPets or {}
+    return mainExcludedPets[petId] == true
 end
 
 function PetFunctions.getExcludedPetIds()
+    local mainExcludedPets = excludedPets or {}
     local ids = {}
-    for petId, _ in pairs(excludedPets) do
+    for petId, _ in pairs(mainExcludedPets) do
         table.insert(ids, petId)
     end
     return ids
 end
-
 -- Getters and Setters
 function PetFunctions.setAutoMiddleEnabled(enabled)
     autoMiddleEnabled = enabled
@@ -492,10 +501,6 @@ end
 
 function PetFunctions.getAutoMiddleEnabled()
     return autoMiddleEnabled
-end
-
-function PetFunctions.setPetCountLabel(label)
-    petCountLabel = label
 end
 
 function PetFunctions.setPetDropdown(dropdown)
@@ -522,7 +527,6 @@ end
 task.spawn(function()
     task.wait(1) -- Wait a moment for everything to load
     PetFunctions.refreshPets()
-    PetFunctions.updatePetCount()
 end)
 
 PetFunctions.updateDropdownOptions()
@@ -531,7 +535,6 @@ PetFunctions.updateDropdownOptions()
 _G.updateDropdownOptions = PetFunctions.updateDropdownOptions
 _G.refreshPets = PetFunctions.refreshPets
 _G.isPetExcluded = PetFunctions.isPetExcluded
-_G.getExcludedPetCount = PetFunctions.getExcludedPetCount
 _G.getExcludedPetIds = PetFunctions.getExcludedPetIds
 
 return PetFunctions
