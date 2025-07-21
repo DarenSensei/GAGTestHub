@@ -400,7 +400,8 @@ function PetFunctions.selectAllPets()
     for _, pet in pairs(pets) do
         selectedPets[pet.id] = true
     end
-    
+end
+
 -- Function to update dropdown options
 function PetFunctions.updateDropdownOptions()
     local pets = PetFunctions.getAllPets()
@@ -443,7 +444,19 @@ function PetFunctions.getAllPetsSelected()
     return allPetsSelected or false
 end
 
--- Additional helper function to select individual pets
+function PetFunctions.setSelectedPets(pets)
+    selectedPets = pets
+end
+
+function PetFunctions.setExcludedPets(pets)
+    excludedPets = pets
+end
+
+function PetFunctions.setAllPetsSelected(value)
+    allPetsSelected = value
+end
+
+-- Function to select individual pets
 function PetFunctions.selectPet(petId)
     if not selectedPets then
         selectedPets = {}
@@ -470,11 +483,21 @@ function PetFunctions.excludePet(petId)
     if selectedPets then
         selectedPets[petId] = nil
     end
+end
 
 -- Helper functions for managing pet exclusions
 function PetFunctions.isPetExcluded(petId)
     local mainExcludedPets = excludedPets or {}
     return mainExcludedPets[petId] == true
+end
+
+function PetFunctions.getExcludedPetCount()
+    local mainExcludedPets = excludedPets or {}
+    local count = 0
+    for _ in pairs(mainExcludedPets) do
+        count = count + 1
+    end
+    return count
 end
 
 function PetFunctions.getExcludedPetIds()
@@ -485,6 +508,7 @@ function PetFunctions.getExcludedPetIds()
     end
     return ids
 end
+
 -- Getters and Setters
 function PetFunctions.setAutoMiddleEnabled(enabled)
     autoMiddleEnabled = enabled
@@ -507,20 +531,8 @@ function PetFunctions.setPetDropdown(dropdown)
     petDropdown = dropdown
 end
 
-function PetFunctions.getSelectedPets()
-    return selectedPets
-end
-
-function PetFunctions.getExcludedPets()
-    return excludedPets
-end
-
 function PetFunctions.getCurrentPetsList()
     return currentPetsList
-end
-
-function PetFunctions.setExcludedPets(pets)
-    excludedPets = pets
 end
 
 -- Initialize the system with auto refresh
@@ -535,6 +547,7 @@ PetFunctions.updateDropdownOptions()
 _G.updateDropdownOptions = PetFunctions.updateDropdownOptions
 _G.refreshPets = PetFunctions.refreshPets
 _G.isPetExcluded = PetFunctions.isPetExcluded
+_G.getExcludedPetCount = PetFunctions.getExcludedPetCount
 _G.getExcludedPetIds = PetFunctions.getExcludedPetIds
 
 return PetFunctions
