@@ -74,35 +74,10 @@ local autoShovelConnection = nil
 local autoBuyEnabled = false
 local buyConnection = nil
 
-WindUI:Popup({
-    Title = "Welcome to GAGSL Hub!",
-    Icon = "rbxassetid://104330117214829",
-    IconThemed = true, -- Optional: makes icon match theme colors
-    Content = "Since you use GAGSL you gain +999 pogi points!",
-    Buttons = {
-        {
-            Title = "Cancel",
-            Callback = function() 
-                -- Code to run when Cancel is clicked
-                print("User cancelled")
-            end,
-            Variant = "Secondary", -- Button style: Primary, Secondary, or Tertiary
-        },
-        {
-            Title = "Continue",
-            Icon = "arrow-right", -- Optional icon
-            Callback = function() 
-                -- Code to run when Continue is clicked
-                print("User continued")
-                -- You might want to set a variable here like: Confirmed = true
-            end,
-            Variant = "Primary", -- Makes this the main action button
-        }
-    }
-})
 -- Create Wind UI Window
 local Window = WindUI:CreateWindow({
-    Title = "GAGSL Hub (v1.2.4)",
+    Icon = "rbxassetid://76107566118223",
+    Title = "GAGSL Hub (v1.2.3)",
     SubTitle = "Grow A Garden Script Loader",
     TabWidth = 160,
     Size = UDim2.fromOffset(470, 350),
@@ -360,7 +335,7 @@ local Tab = Window:Tab({
 })
 
 Tab:Section({
-    Title = "INF. Sprinkler"
+    Title = "--INF. Sprinkler--"
 })
 
 -- Sprinkler dropdown
@@ -455,8 +430,10 @@ Tab:Button({
     end
 })
 
+Tab:Divider()
+
 Tab:Section({
-    Title = "-PET EXPLOIT-"
+    Title = "--PET EXPLOIT--"
 })
 
 Tab:Paragraph({
@@ -565,8 +542,10 @@ Tab:Toggle({
     end
 })
 
+Tab:Divider()
+
 Tab:Section({
-    Title = "AUTO SHOVEL"
+    Title = "--AUTO SHOVEL--"
 })
 
 cropDropdown = Tab:Dropdown({
@@ -681,6 +660,10 @@ ShopTab:Paragraph({
 -- Zen Shop Section
 ShopTab:Divider()
 
+ShopTab:Section({
+    Title = "--Zen--"
+})
+
 local zenItemOptions = {"None"}
 if AutoBuy and AutoBuy.zenItems and type(AutoBuy.zenItems) == "table" then
     for _, item in pairs(AutoBuy.zenItems) do
@@ -727,6 +710,10 @@ ShopTab:Toggle({
 
 -- Traveling Merchant Section
 ShopTab:Divider()
+
+ShopTab:Section({
+    Title = "--Traveling Merchant--"
+})
 
 local merchantItemOptions = {"None"}
 if AutoBuy and AutoBuy.merchantItems and type(AutoBuy.merchantItems) == "table" then
@@ -775,6 +762,10 @@ ShopTab:Toggle({
 -- Pet Eggs Section
 ShopTab:Divider()
 
+ShopTab:Section({
+    Title = "--Egg Shop--"
+})
+
 ShopTab:Dropdown({
     Title = "Select Eggs to Auto Buy",
     Desc = "Choose eggs to automatically purchase",
@@ -815,6 +806,10 @@ ShopTab:Toggle({
 -- Seeds Section
 ShopTab:Divider()
 
+ShopTab:Section({
+    Title = "--Seed Shop--"
+})
+
 ShopTab:Dropdown({
     Title = "Select Seeds to Auto Buy",
     Desc = "Choose seeds to automatically purchase",
@@ -854,6 +849,10 @@ ShopTab:Toggle({
 
 -- Gear & Tools Section
 ShopTab:Divider()
+
+ShopTab:Section({
+    Title = "--Gears Shop--"
+})
 
 ShopTab:Dropdown({
     Title = "Select Gear to Auto Buy",
@@ -904,6 +903,8 @@ local MiscTab = Window:Tab({
     Icon = "settings",
     Desc = "Performance optimization and miscellaneous features"
 })
+
+MiscTab:Divider()
 
 MiscTab:Paragraph({
     Title = "Lag Reduction",
