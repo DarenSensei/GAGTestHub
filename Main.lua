@@ -591,55 +591,53 @@ local ShopTab = Window:MakeTab({
 
 ShopTab:AddParagraph("Auto Buy", "Auto Buy, Buy even AFK")
 
+-- ===========================================
+-- SHOP TAB CREATION
+-- ===========================================
+
 ShopTab:AddSection({
-    Name = "-Auto Buy Zen-"
+    Name = "-Zen Shop-"
 })
 
 -- Zen Items Multi-Select Dropdown
-local zenOptions = {"None"}
-for _, item in pairs(AutoBuy.zenItems) do
-    table.insert(zenOptions, item)
+local zenItemOptions = {"None"}
+if AutoBuy.zenItems and type(AutoBuy.zenItems) == "table" then
+    for _, item in pairs(AutoBuy.zenItems) do
+        table.insert(zenItemOptions, item)
+    end
 end
 
 ShopTab:AddDropdown({
     Name = "Select Zen Items to Auto Buy",
     Default = {},
-    Options = zenOptions,
+    Options = zenItemOptions,
     Callback = function(selectedValues)
         local success, error = pcall(function()
-            local newSelectedItems = {}
-            
-            if selectedValues and #selectedValues > 0 then
-                local hasNone = false
-                for _, value in pairs(selectedValues) do
-                    if value == "None" then
-                        hasNone = true
-                        break
-                    end
+            if AutoBuy.setSelectedZenItems and type(AutoBuy.setSelectedZenItems) == "function" then
+                local count = AutoBuy.setSelectedZenItems(selectedValues)
+                if count > 0 then
+                    print("Selected " .. count .. " zen items for auto buy")
                 end
-                
-                if not hasNone then
-                    for _, itemName in pairs(selectedValues) do
-                        table.insert(newSelectedItems, itemName)
-                    end
-                end
+            else
+                warn("AutoBuy.setSelectedZenItems is not a function")
             end
-            
-            AutoBuy.setSelectedZenItems(newSelectedItems)
-            print("Selected Zen Items:", table.concat(newSelectedItems, ", "))
         end)
-        
         if not success then
-            warn("Error updating zen items selection:", error)
+            warn("Error setting zen items: " .. tostring(error))
         end
     end
 })
 
 ShopTab:AddToggle({
-    Name = "Enable Zen Auto Buy",
+    Name = "Auto Buy Zen",
     Default = false,
     Callback = function(Value)
-        AutoBuy.toggleAutoBuyZen(Value)
+        if AutoBuy.buySelectedZenItems and type(AutoBuy.buySelectedZenItems) == "function" then
+            AutoBuy.buySelectedZenItems(Value)
+        else
+            warn("AutoBuy.buySelectedZenItems is not a function")
+        end
+        
         if Value then
             OrionLib:MakeNotification({
                 Name = "Auto Buy Zen",
@@ -652,7 +650,7 @@ ShopTab:AddToggle({
 })
 
 -- ===========================================
--- MERCHANT SHOP TAB
+-- TRAVELING MERCHANT SECTION
 -- ===========================================
 
 ShopTab:AddSection({
@@ -660,37 +658,31 @@ ShopTab:AddSection({
 })
 
 -- Merchant Items Multi-Select Dropdown
-local merchantOptions = {"None"}
-for _, item in pairs(AutoBuy.merchantItems) do
-    table.insert(merchantOptions, item)
+local merchantItemOptions = {"None"}
+if AutoBuy.merchantItems and type(AutoBuy.merchantItems) == "table" then
+    for _, item in pairs(AutoBuy.merchantItems) do
+        table.insert(merchantItemOptions, item)
+    end
 end
 
 ShopTab:AddDropdown({
     Name = "Select Merchant Items to Auto Buy",
     Default = {},
-    Options = merchantOptions,
+    Options = merchantItemOptions,
     Callback = function(selectedValues)
         local success, error = pcall(function()
-            local newSelectedItems = {}
-            
-            if selectedValues and #selectedValues > 0 then
-                local hasNone = false
-                for _, value in pairs(selectedValues) do
-                    if value == "None" then
-                        hasNone = true
-                        break
-                    end
+            if AutoBuy.setSelectedMerchantItems and type(AutoBuy.setSelectedMerchantItems) == "function" then
+                local count = AutoBuy.setSelectedMerchantItems(selectedValues)
+                if count > 0 then
+                    print("Selected " .. count .. " merchant items for auto buy")
                 end
-                
-                if not hasNone then
-                    for _, itemName in pairs(selectedValues) do
-                        table.insert(newSelectedItems, itemName)
-                    end
-                end
+            else
+                warn("AutoBuy.setSelectedMerchantItems is not a function")
             end
-            
-            AutoBuy.setSelectedMerchantItems(newSelectedItems)
         end)
+        if not success then
+            warn("Error setting merchant items: " .. tostring(error))
+        end
     end
 })
 
@@ -698,7 +690,12 @@ ShopTab:AddToggle({
     Name = "Auto Buy Merchant",
     Default = false,
     Callback = function(Value)
-        AutoBuy.toggleAutoBuyMerchant(Value)
+        if AutoBuy.buySelectedMerchantItems and type(AutoBuy.buySelectedMerchantItems) == "function" then
+            AutoBuy.buySelectedMerchantItems(Value)
+        else
+            warn("AutoBuy.buySelectedMerchantItems is not a function")
+        end
+        
         if Value then
             OrionLib:MakeNotification({
                 Name = "Auto Buy Merchant",
@@ -710,100 +707,168 @@ ShopTab:AddToggle({
     end
 })
 
--- ========================================
+-- ===========================================
 -- EGG SECTION
--- ========================================
-ShopTab:AddSection({Name = "-Egg-"})
--- Egg Dropdown
-local eggDropdown = ShopTab:AddDropdown({
-    Name = "Select Eggs",
+-- ===========================================
+
+ShopTab:AddSection({
+    Name = "-Pet Eggs-"
+})
+
+-- Egg Multi-Select Dropdown
+ShopTab:AddDropdown({
+    Name = "Select Eggs to Auto Buy",
     Default = {},
-    Options = AutoBuy.eggOptions,
+    Options = AutoBuy.eggOptions or {"None"},
     Callback = function(selectedValues)
-        local selectedCount = AutoBuy.setSelectedEggs(selectedValues)
+        local success, error = pcall(function()
+            if AutoBuy.setSelectedEggs and type(AutoBuy.setSelectedEggs) == "function" then
+                local count = AutoBuy.setSelectedEggs(selectedValues)
+                if count > 0 then
+                    print("Selected " .. count .. " eggs for auto buy")
+                end
+            else
+                warn("AutoBuy.setSelectedEggs is not a function")
+            end
+        end)
+        if not success then
+            warn("Error setting eggs: " .. tostring(error))
+        end
     end
 })
 
 -- Auto Buy Egg Toggle
-local autoBuyEggToggle = ShopTab:AddToggle({
-    Name = "Auto Buy Egg",
+ShopTab:AddToggle({
+    Name = "Auto Buy Eggs",
     Default = false,
     Callback = function(value)
-        AutoBuy.toggleEgg(value)
+        if AutoBuy.toggleEgg and type(AutoBuy.toggleEgg) == "function" then
+            AutoBuy.toggleEgg(value)
+        else
+            warn("AutoBuy.toggleEgg is not a function")
+        end
         
         if value then
             OrionLib:MakeNotification({
-                Name = "Auto Buy Egg",
-                Content = "Auto Buy Egg enabled!",
+                Name = "Auto Buy Eggs",
+                Content = "Auto Buy Eggs enabled!",
+                Image = "rbxassetid://4483345998",
                 Time = 2
             })
         end
     end
 })
 
--- ========================================
+-- ===========================================
 -- SEED SECTION
--- ========================================
-ShopTab:AddSection({Name = "-Seed-"})
--- Seed Dropdown
-local seedDropdown = ShopTab:AddDropdown({
+-- ===========================================
+
+ShopTab:AddSection({
+    Name = "-Seeds-"
+})
+
+-- Seed Multi-Select Dropdown
+ShopTab:AddDropdown({
     Name = "Select Seeds to Auto Buy",
     Default = {},
-    Options = AutoBuy.seedOptions,
+    Options = AutoBuy.seedOptions or {"None"},
     Callback = function(selectedValues)
-        local selectedCount = AutoBuy.setSelectedSeeds(selectedValues)
+        local success, error = pcall(function()
+            if AutoBuy.setSelectedSeeds and type(AutoBuy.setSelectedSeeds) == "function" then
+                local count = AutoBuy.setSelectedSeeds(selectedValues)
+                if count > 0 then
+                    print("Selected " .. count .. " seeds for auto buy")
+                end
+            else
+                warn("AutoBuy.setSelectedSeeds is not a function")
+            end
+        end)
+        if not success then
+            warn("Error setting seeds: " .. tostring(error))
+        end
     end
 })
 
 -- Auto Buy Seed Toggle
-local autoBuySeedToggle = ShopTab:AddToggle({
-    Name = "Auto Buy Seed",
+ShopTab:AddToggle({
+    Name = "Auto Buy Seeds",
     Default = false,
     Callback = function(value)
-        AutoBuy.toggleSeed(value)
+        if AutoBuy.toggleSeed and type(AutoBuy.toggleSeed) == "function" then
+            AutoBuy.toggleSeed(value)
+        else
+            warn("AutoBuy.toggleSeed is not a function")
+        end
         
         if value then
             OrionLib:MakeNotification({
-                Name = "Auto Buy Seed",
-                Content = "Auto Buy Seed enabled!",
+                Name = "Auto Buy Seeds",
+                Content = "Auto Buy Seeds enabled!",
+                Image = "rbxassetid://4483345998",
                 Time = 2
             })
         end
     end
 })
 
--- ========================================
+-- ===========================================
 -- GEAR SECTION
--- ========================================
-ShopTab:AddSection({Name = "-Gears-"})
--- Gear Dropdown
-local gearDropdown = ShopTab:AddDropdown({
+-- ===========================================
+
+ShopTab:AddSection({
+    Name = "-Gear & Tools-"
+})
+
+-- Gear Multi-Select Dropdown
+ShopTab:AddDropdown({
     Name = "Select Gear to Auto Buy",
     Default = {},
-    Options = AutoBuy.gearOptions,
+    Options = AutoBuy.gearOptions or {"None"},
     Callback = function(selectedValues)
-        local selectedCount = AutoBuy.setSelectedGear(selectedValues)
+        local success, error = pcall(function()
+            if AutoBuy.setSelectedGear and type(AutoBuy.setSelectedGear) == "function" then
+                local count = AutoBuy.setSelectedGear(selectedValues)
+                if count > 0 then
+                    print("Selected " .. count .. " gear items for auto buy")
+                end
+            else
+                warn("AutoBuy.setSelectedGear is not a function")
+            end
+        end)
+        if not success then
+            warn("Error setting gear: " .. tostring(error))
+        end
     end
 })
 
 -- Auto Buy Gear Toggle
-local autoBuyGearToggle = ShopTab:AddToggle({
+ShopTab:AddToggle({
     Name = "Auto Buy Gear",
     Default = false,
     Callback = function(value)
-        AutoBuy.toggleGear(value)
+        if AutoBuy.toggleGear and type(AutoBuy.toggleGear) == "function" then
+            AutoBuy.toggleGear(value)
+        else
+            warn("AutoBuy.toggleGear is not a function")
+        end
         
         if value then
             OrionLib:MakeNotification({
                 Name = "Auto Buy Gear",
                 Content = "Auto Buy Gear enabled!",
+                Image = "rbxassetid://4483345998",
                 Time = 2
             })
         end
     end
 })
 
-AutoBuy.startLoop()
+-- Initialize the AutoBuy module
+if AutoBuy.init and type(AutoBuy.init) == "function" then
+    AutoBuy.init()
+else
+    warn("AutoBuy.init is not a function or doesn't exist")
+end
 
 -- MISC TAB
 local MiscTab = Window:MakeTab({
@@ -860,7 +925,7 @@ SocialTab:AddParagraph("YOUTUBE", "YUraxYZ")
 
 -- Discord button
 SocialTab:AddButton({
-    Name = "Yura Community Discord",
+    Name = "GAGSL Community Discord",
     Callback = function()
         if setclipboard then
             setclipboard("https://discord.gg/gpR7YQjnFt")
