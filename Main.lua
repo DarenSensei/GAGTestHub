@@ -21,6 +21,7 @@ local autoMiddleEnabled = false
 local currentPetsList = {}
 local petCountLabel = nil
 local petDropdown = nil
+local cropDropdown = nil
 
 -- Sprinkler variables
 local sprinklerTypes = {"Basic Sprinkler", "Advanced Sprinkler", "Master Sprinkler", "Godly Sprinkler", "Honey Sprinkler", "Chocolate Sprinkler"}
@@ -436,63 +437,82 @@ Tab:AddToggle({
 -- Auto Shovel Section - FIXED
 Tab:AddParagraph("Auto Shovel Crops", "Automatically shovel crops based on weight threshold.")
 
--- Crop selection dropdown - FIXED to use CoreFunctions
-local cropDropdown = Tab:AddDropdown({
-    Name = "Select Crops to Shovel",
-    Default = {},
-    Options = (function()
-        local options = {"None"}
-        local cropTypes = CoreFunctions.getCropTypes()  -- Changed from Functions to CoreFunctions
-        for _, cropType in ipairs(cropTypes) do
-            table.insert(options, cropType)
-        end
-        return options
-    end)(),
+AutoShovelTab:AddSection({Name = "Crop Selection"})
+
+cropDropdown = AutoShovelTab:AddDropdown({
+    Name = "Select Crops to Monitor",
+    Default = {"All Plants"},
+    Options = CoreFunctions.getCropTypes(),
     Callback = function(selectedValues)
-        CoreFunctions.clearSelectedCrops()  -- Changed from Functions to CoreFunctions
+        local selectedCrops = {}
+        
         if selectedValues and #selectedValues > 0 then
-            local hasNone = false
+            local hasAllPlants = false
             for _, value in pairs(selectedValues) do
-                if value == "None" then
-                    hasNone = true
+                if value == "All Plants" then
+                    hasAllPlants = true
                     break
                 end
             end
-            if not hasNone then
+            
+            if not hasAllPlants then
                 for _, cropName in pairs(selectedValues) do
-                    CoreFunctions.addTreeToSelection(cropName)  -- Changed from Functions to CoreFunctions
+                    selectedCrops[cropName] = true
                 end
             end
+        end
+        
+        CoreFunctions.setSelectedCrops(selectedCrops)
+    end
+})
+
+AutoShovelTab:AddButton({
+    Name = "Refresh Crop List",
+    Callback = function()
+        local newCropTypes = CoreFunctions.getCropTypes()
+        cropDropdown:Refresh(newCropTypes, true)
+        
+        OrionLib:MakeNotification({
+            Name = "List Refreshed",
+            Content = string.format("Found %d crop types", #newCropTypes - 1),
+            Time = 2
+        })
+    end
+})
+
+-- Weight Settings Section
+AutoShovelTab:AddSection({Name = "Weight Settings"})
+
+AutoShovelTab:AddTextbox({
+    Name = "Remove Fruits Below (kg)",
+    Default = tostring(CoreFunctions.getTargetFruitWeight()),
+    TextDisappear = false,
+    Callback = function(value)
+        local weight = tonumber(value)
+        if CoreFunctions.setTargetFruitWeight(weight) then
+            OrionLib:MakeNotification({
+                Name = "Weight Updated",
+                Content = string.format("Target weight set to %.1fkg", weight),
+                Time = 2
+            })
+        else
+            OrionLib:MakeNotification({
+                Name = "Invalid Weight",
+                Content = "Please enter a valid number above 0",
+                Time = 3
+            })
         end
     end
 })
 
--- Crop weight threshold input - FIXED
-Tab:AddTextbox({
-    Name = "Crop Weight Threshold (KG)",
-    Default = "1",
-    TextDisappear = false,
-    Callback = function(value)
-        CoreFunctions.setTreeWeightThreshold(value)  -- Changed from Functions to CoreFunctions
-    end
-})
+-- Auto Shovel Control Section
+AutoShovelTab:AddSection({Name = "Auto Shovel Control"})
 
--- Refresh crop list button - FIXED
-Tab:AddButton({
-    Name = "Refresh Crop List",
-    Callback = function()
-        local options = CoreFunctions.Functions.refreshTreeList()  -- Changed from Functions to CoreFunctions
-        cropDropdown:Refresh(options, true)
-    end
-})
-
--- Auto shovel crops toggle - FIXED
-Tab:AddToggle({
-    Name = "Auto Shovel Crops",
-    Default = false,
-    Callback = function(value)
-        CoreFunctions.toggleAutoShovelTrees(value, OrionLib)  -- Changed from Functions to CoreFunctions
-    end
+AutoShovelTab:AddToggle({
+    Name = "Enable Auto Shovel",
+    Default = CoreFunctions.getAutoShovelStatus(),
+    Callback = function(enabled)
+        local success, message = CoreFunctions.toggleAutoShovel(enabled)
 })
 
 -- SHOP TAB
