@@ -206,6 +206,9 @@ function CoreFunctions.getFruitsToRemove()
                 -- Skip plant Base
                 if fruit.Name == "Base" and fruit.Parent == plant then continue end
                 
+                -- NEW: Skip fruits with LockBillboardGui (locked fruits)
+                if fruit:FindFirstChild("LockBillboardGui") then continue end
+                
                 local fruitWeight = fruit:FindFirstChild("Weight")
                 local fruitPrimaryPart = fruit.PrimaryPart
                 local fruitBase = fruit:FindFirstChild("Base")
@@ -325,12 +328,16 @@ function CoreFunctions.toggleAutoShovel(enabled)
         end
         
         if autoShovelConnection then autoShovelConnection:Disconnect() end
+        
+        -- NEW: Continuous loop instead of single run
         autoShovelConnection = RunService.Heartbeat:Connect(function()
-            CoreFunctions.autoShovel()
-            task.wait(3)
+            while autoShovelEnabled do
+                CoreFunctions.autoShovel()
+                task.wait(3) -- Wait 3 seconds between cycles
+            end
         end)
         
-        return true, string.format("Auto Shovel Started - Removing fruits below %.1fkg", targetFruitWeight)
+        return true, string.format("Auto Shovel Started (Continuous Loop) - Removing fruits below %.1fkg", targetFruitWeight)
     else
         if autoShovelConnection then
             autoShovelConnection:Disconnect()
