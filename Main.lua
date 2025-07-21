@@ -27,6 +27,7 @@ end
 local CoreFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/CoreFunctions.lua", "CoreFunctions")
 local PetFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/PetMiddleFunctions.lua", "PetFunctions")
 local OrionLib = safeLoad("https://raw.githubusercontent.com/YuraScripts/GrowAFilipinoy/refs/heads/main/TEST.lua", "OrionLib")
+local AutoBuy = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/AutoBuy.lua", "AutoBuy")
 
 -- Check if all dependencies loaded successfully
 if not CoreFunctions then
@@ -729,8 +730,122 @@ ShopTab:AddToggle({
     end    
 })
 
-ShopTab:AddParagraph("AUTO BUY GEARS", "COMING SOON...")
-ShopTab:AddParagraph("AUTO BUY SEEDS", "COMING SOON...")
+-- ========================================
+-- EGG SECTION
+-- ========================================
+
+-- Egg Dropdown
+local eggDropdown = Tab:AddDropdown({
+    Name = "Select Eggs",
+    Default = {},
+    Options = AutoBuy.eggOptions,
+    Callback = function(selectedValues)
+        local selectedCount = AutoBuy.setSelectedEggs(selectedValues)
+    end
+})
+
+-- Auto Buy Egg Toggle
+local autoBuyEggToggle = Tab:AddToggle({
+    Name = "Auto Buy Egg",
+    Default = false,
+    Callback = function(value)
+        AutoBuy.toggleEgg(value)
+        
+        if value then
+            OrionLib:MakeNotification({
+                Name = "Auto Buy Egg",
+                Content = "Auto Buy Egg enabled!",
+                Time = 2
+            })
+        else
+            OrionLib:MakeNotification({
+                Name = "Auto Buy Egg",
+                Content = "Auto Buy Egg disabled!",
+                Time = 2
+            })
+        end
+    end
+})
+
+-- ========================================
+-- SEED SECTION
+-- ========================================
+
+-- Seed Dropdown
+local seedDropdown = Tab:AddDropdown({
+    Name = "Select Seeds to Auto Buy",
+    Default = {},
+    Options = AutoBuy.seedOptions,
+    Callback = function(selectedValues)
+        local selectedCount = AutoBuy.setSelectedSeeds(selectedValues)
+    end
+})
+
+-- Auto Buy Seed Toggle
+local autoBuySeedToggle = Tab:AddToggle({
+    Name = "Auto Buy Seed",
+    Default = false,
+    Callback = function(value)
+        AutoBuy.toggleSeed(value)
+        
+        if value then
+            OrionLib:MakeNotification({
+                Name = "Auto Buy Seed",
+                Content = "Auto Buy Seed enabled!",
+                Time = 2
+            })
+        else
+            OrionLib:MakeNotification({
+                Name = "Auto Buy Seed",
+                Content = "Auto Buy Seed disabled!",
+                Time = 2
+            })
+        end
+    end
+})
+
+-- ========================================
+-- GEAR SECTION
+-- ========================================
+
+-- Gear Dropdown
+local gearDropdown = Tab:AddDropdown({
+    Name = "Select Gear to Auto Buy",
+    Default = {},
+    Options = AutoBuy.gearOptions,
+    Callback = function(selectedValues)
+        local selectedCount = AutoBuy.setSelectedGear(selectedValues)
+})
+
+-- Auto Buy Gear Toggle
+local autoBuyGearToggle = Tab:AddToggle({
+    Name = "Auto Buy Gear",
+    Default = false,
+    Callback = function(value)
+        AutoBuy.toggleGear(value)
+        
+        if value then
+            OrionLib:MakeNotification({
+                Name = "Auto Buy Gear",
+                Content = "Auto Buy Gear enabled!",
+                Time = 2
+            })
+        else
+            OrionLib:MakeNotification({
+                Name = "Auto Buy Gear",
+                Content = "Auto Buy Gear disabled!",
+                Time = 2
+            })
+        end
+    end
+})
+
+-- ========================================
+-- START AUTO BUY LOOP
+-- ========================================
+
+-- Start the auto buy loop
+AutoBuy.startLoop()
 
 -- MISC TAB
 local MiscTab = Window:MakeTab({
