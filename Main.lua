@@ -516,17 +516,9 @@ Tab:AddToggle({
     end
 })
 
--- Auto Shovel Section - Create the tab first
-local AutoShovelTab = Window:MakeTab({
-    Name = "Auto Shovel",
-    Icon = "rbxassetid://6031280882",
-    PremiumOnly = false
-})
+Tab:AddSection({Name = "AUTO SHOVEL"})
 
-AutoShovelTab:AddParagraph("Auto Shovel Crops", "Automatically shovel crops based on weight threshold.")
-
-AutoShovelTab:AddSection({Name = "Crop Selection"})
-
+Tab:AddParagraph("Auto Shovel Crops", "Automatically shovel crops based on weight threshold.")
 cropDropdown = AutoShovelTab:AddDropdown({
     Name = "Select Crops to Monitor",
     Default = {"All Plants"},
@@ -554,7 +546,7 @@ cropDropdown = AutoShovelTab:AddDropdown({
     end
 })
 
-AutoShovelTab:AddButton({
+Tab:AddButton({
     Name = "Refresh Crop List",
     Callback = function()
         local newCropTypes = safeCall(CoreFunctions.getCropTypes, "getCropTypes") or {"All Plants"}
@@ -570,10 +562,7 @@ AutoShovelTab:AddButton({
     end
 })
 
--- Weight Settings Section
-AutoShovelTab:AddSection({Name = "Weight Settings"})
-
-AutoShovelTab:AddTextbox({
+Tab:AddTextbox({
     Name = "Remove Fruits Below (kg)",
     Default = tostring(safeCall(CoreFunctions.getTargetFruitWeight, "getTargetFruitWeight") or 50),
     TextDisappear = false,
@@ -597,11 +586,7 @@ AutoShovelTab:AddTextbox({
         end
     end
 })
-
--- Auto Shovel Control Section
-AutoShovelTab:AddSection({Name = "Auto Shovel Control"})
-
-AutoShovelTab:AddToggle({
+Tab:AddToggle({
     Name = "Enable Auto Shovel",
     Default = safeCall(CoreFunctions.getAutoShovelStatus, "getAutoShovelStatus") or false,
     Callback = function(enabled)
