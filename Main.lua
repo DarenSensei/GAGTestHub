@@ -1,4 +1,4 @@
--- Main GAGSL Hub Script (FIXED UI ERRORS)
+-- GAGSL Hub Script (Wind UI Version)
 repeat task.wait() until game:IsLoaded()
 
 -- Safe loading function with error handling
@@ -23,10 +23,16 @@ local function safeLoad(url, name)
     return result
 end
 
+-- Load Wind UI library
+local WindUI = safeLoad("https://raw.githubusercontent.com/YuraScripts/Grow-A-Pinoy/refs/heads/main/WindUI.lua", "WindUI")
+
+if not WindUI then
+    error("Failed to load Wind UI - script cannot continue")
+end
+
 -- Load external functions with error handling
 local CoreFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/CoreFunctions.lua", "CoreFunctions")
-local PetFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/PetMiddleFunctions.lua", "PetFunctions")
-local OrionLib = safeLoad("https://raw.githubusercontent.com/YuraScripts/GrowAFilipinoy/refs/heads/main/TEST.lua", "OrionLib")
+local PetFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/PetMiddleFunctions.lua", "PetFunctions")
 local AutoBuy = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/AutoBuy.lua", "AutoBuy")
 
 -- Check if all dependencies loaded successfully
@@ -36,10 +42,6 @@ end
 
 if not PetFunctions then
     error("Failed to load PetFunctions - script cannot continue")
-end
-
-if not OrionLib then
-    error("Failed to load OrionLib - script cannot continue")
 end
 
 -- Services
@@ -62,7 +64,7 @@ local cropDropdown = nil
 local sprinklerTypes = {"Basic Sprinkler", "Advanced Sprinkler", "Master Sprinkler", "Godly Sprinkler", "Honey Sprinkler", "Chocolate Sprinkler"}
 local selectedSprinklers = {}
 
--- Auto Shovel variables (FIXED)
+-- Auto Shovel variables
 local selectedFruitTypes = {}
 local weightThreshold = 50
 local autoShovelEnabled = false
@@ -72,42 +74,41 @@ local autoShovelConnection = nil
 local autoBuyEnabled = false
 local buyConnection = nil
 
--- Create Orion UI
-local Window = OrionLib:MakeWindow({
-    Name = "GAGSL Hub (v1.2.1)",
-    HidePremium = false,
-    IntroText = "Grow A Garden Script Loader",
-    SaveConfig = false
+WindUI:Popup({
+    Title = "Welcome to GAGSL Hub!",
+    Icon = "rbxassetid://104330117214829",
+    IconThemed = true, -- Optional: makes icon match theme colors
+    Content = "Since you use GAGSL you gain +999 pogi points!",
+    Buttons = {
+        {
+            Title = "Cancel",
+            Callback = function() 
+                -- Code to run when Cancel is clicked
+                print("User cancelled")
+            end,
+            Variant = "Secondary", -- Button style: Primary, Secondary, or Tertiary
+        },
+        {
+            Title = "Continue",
+            Icon = "arrow-right", -- Optional icon
+            Callback = function() 
+                -- Code to run when Continue is clicked
+                print("User continued")
+                -- You might want to set a variable here like: Confirmed = true
+            end,
+            Variant = "Primary", -- Makes this the main action button
+        }
+    }
 })
-
--- Fade in animation with better error handling
-local function fadeInMainTab()
-    local success, error = pcall(function()
-        local playerGui = player:WaitForChild("PlayerGui", 5)
-        if not playerGui then return end
-        
-        local orionGui = playerGui:WaitForChild("Orion", 5)
-        if not orionGui then return end
-        
-        local mainFrame = orionGui:WaitForChild("Main", 5)
-        if not mainFrame then return end
-        
-        mainFrame.BackgroundTransparency = 1
-
-        local tween = TweenService:Create(
-            mainFrame,
-            TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-            { BackgroundTransparency = 0.2 }
-        )
-        tween:Play()
-    end)
-    
-    if not success then
-        warn("Failed to create fade animation: " .. tostring(error))
-    end
-end
-
-task.delay(1.5, fadeInMainTab)
+-- Create Wind UI Window
+local Window = WindUI:CreateWindow({
+    Title = "GAGSL Hub (v1.2.4)",
+    SubTitle = "Grow A Garden Script Loader",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(470, 350),
+    Acrylic = true,
+    Theme = "Dark"
+})
 
 -- Safe function call wrapper
 local function safeCall(func, funcName, ...)
@@ -123,6 +124,15 @@ local function safeCall(func, funcName, ...)
     end
     
     return result
+end
+
+-- Notification helper
+local function notify(title, content, duration)
+    WindUI:Notify({
+        Title = title,
+        Content = content,
+        Duration = duration or 3
+    })
 end
 
 -- FIXED: Sprinkler helper functions using CoreFunctions
@@ -182,7 +192,7 @@ local function autoEquipShovel()
 end
 
 local function deleteSprinklers()
-    safeCall(CoreFunctions.deleteSprinklers, "deleteSprinklers", selectedSprinklers, OrionLib)
+    safeCall(CoreFunctions.deleteSprinklers, "deleteSprinklers", selectedSprinklers, WindUI)
 end
 
 local function setupZoneAbilityListener()
@@ -206,124 +216,166 @@ local function cleanup()
     end
 end
 
-local function buyAllZenItems()
-    safeCall(CoreFunctions.buyAllZenItems, "buyAllZenItems")
-end
-
-local function buyAllMerchantItems()
-    safeCall(CoreFunctions.buyAllMerchantItems, "buyAllMerchantItems")
-end
-
 local function removeFarms()
-    safeCall(CoreFunctions.removeFarms, "removeFarms", OrionLib)
+    safeCall(CoreFunctions.removeFarms, "removeFarms", WindUI)
 end
 
+-- ===========================================
 -- MAIN TAB
-local ToolsTab = Window:MakeTab({
-    Name = "Main",
-    Icon = "rbxassetid://6031280882",
-    PremiumOnly = false
+-- ===========================================
+local MainTab = Window:Tab({ 
+    Title = "Main", 
+    Icon = "house" 
 })
 
--- Server info
-ToolsTab:AddParagraph("Server Version🌐", tostring(game.PrivateServerId ~= "" and "Private Server" or game.PlaceVersion))
+MainTab:Paragraph({
+    Title = "📜Changelogs : (v.1.2.3)",
+    Desc = "Added : New GUI",
+    color = "#c7c0b7",
+})
 
--- Job ID input
-ToolsTab:AddTextbox({
-    Name = "Join Job ID",
-    Default = "",
-    TextDisappear = true,
-    PlaceholderText = "Paste Job ID & press Enter",
+-- Server info section
+MainTab:Section({ Title = "Server Information" })
+
+MainTab:Paragraph({
+    Title = "Server Version",
+    Desc = tostring(" Version : " .. game.PlaceVersion),
+    Icon = "server",
+})
+
+-- Server controls
+MainTab:Section({ Title = "Server Controls" })
+
+MainTab:Input({
+    Title = "Join Job ID",
+    Desc = "Enter Job ID to teleport",
+    Placeholder = "Paste Job ID here...",
     Callback = function(jobId)
         if jobId and jobId ~= "" then
             local success, error = pcall(function()
                 game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, jobId, player)
             end)
             if not success then
-                warn("Failed to teleport: " .. tostring(error))
+                WindUI:Notify({
+                    Title = "Error",
+                    Content = "Failed to teleport: " .. tostring(error),
+                    Duration = 5,
+                    Icon = "alert-triangle"
+                })
+            else
+                WindUI:Notify({
+                    Title = "Teleporting",
+                    Content = "Joining server...",
+                    Duration = 3,
+                    Icon = "zap"
+                })
             end
         end
     end
 })
 
--- Copy Job ID
-ToolsTab:AddButton({
-    Name = "Copy Current Job ID",
+MainTab:Button({
+    Title = "Copy Current Job ID",
+    Desc = "Copy this server's Job ID to clipboard",
+    Icon = "copy",
     Callback = function()
         if setclipboard then
             setclipboard(game.JobId)
-            OrionLib:MakeNotification({
-                Name = "Copied!",
-                Content = "Current Job ID copied to clipboard.",
-                Time = 3
+            WindUI:Notify({
+                Title = "Success",
+                Content = "Job ID copied to clipboard!",
+                Duration = 3,
+                Icon = "check"
             })
         else
-            warn("Clipboard access not available.")
+            WindUI:Notify({
+                Title = "Error",
+                Content = "Clipboard access not available",
+                Duration = 3,
+                Icon = "x"
+            })
         end
     end
 })
 
--- Rejoin server
-ToolsTab:AddButton({
-    Name = "Rejoin Server",
+MainTab:Button({
+    Title = "Rejoin Server",
+    Desc = "Rejoin the current server",
+    Icon = "refresh-cw",
     Callback = function()
         local success, error = pcall(function()
             game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
         end)
         if not success then
-            warn("Failed to rejoin: " .. tostring(error))
+            WindUI:Notify({
+                Title = "Error",
+                Content = "Failed to rejoin: " .. tostring(error),
+                Duration = 5,
+                Icon = "alert-triangle"
+            })
         end
     end
 })
 
--- Server hop
-ToolsTab:AddButton({
-    Name = "Server Hop",
+MainTab:Button({
+    Title = "Server Hop",
+    Desc = "Find and join a different server",
+    Icon = "shuffle",
     Callback = function()
         local foundServer, playerCount = safeCall(CoreFunctions.serverHop, "serverHop")
         if foundServer then
-            OrionLib:MakeNotification({
-                Name = "Server Found",
-                Content = "Found server with " .. tostring(playerCount) .. " players.",
-                Time = 3
+            WindUI:Notify({
+                Title = "Server Found",
+                Content = "Found server with " .. tostring(playerCount) .. " players",
+                Duration = 3,
+                Icon = "users"
             })
             task.wait(3)
             local success, error = pcall(function()
                 game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, foundServer, player)
             end)
             if not success then
-                warn("Failed to server hop: " .. tostring(error))
+                WindUI:Notify({
+                    Title = "Error",
+                    Content = "Failed to server hop: " .. tostring(error),
+                    Duration = 5,
+                    Icon = "alert-triangle"
+                })
             end
         else
-            OrionLib:MakeNotification({
-                Name = "No Servers",
-                Content = "Couldn't find a suitable server.",
-                Time = 3
+            WindUI:Notify({
+                Title = "No Servers",
+                Content = "Couldn't find a suitable server",
+                Duration = 3,
+                Icon = "search-x"
             })
         end
     end
 })
 
 -- FARM TAB
-local Tab = Window:MakeTab({
-    Name = "Farm",
-    Icon = "rbxassetid://6031280882",
-    PremiumOnly = false
+local Tab = Window:Tab({
+    Title = "Farm",
+    Icon = "tractor", -- Using WindUI's lucide icon system
 })
 
-Tab:AddSection({Name = "INF. Sprinkler"})
+Tab:Section({
+    Title = "INF. Sprinkler"
+})
 
 -- Sprinkler dropdown
-local sprinklerDropdown = Tab:AddDropdown({
-    Name = "Select Sprinkler to Delete",
-    Default = {},
-    Options = (function()
+local sprinklerDropdown = Tab:Dropdown({
+    Title = "Select Sprinkler to Delete",
+    Values = (function()
         local options = {"None"}
         for _, sprinklerType in ipairs(getSprinklerTypes()) do
             table.insert(options, sprinklerType)
         end
         return options
     end)(),
+    Value = {},
+    Multi = true,
+    AllowNone = true,
     Callback = function(selectedValues)
         clearSelectedSprinklers()
         
@@ -341,18 +393,20 @@ local sprinklerDropdown = Tab:AddDropdown({
                     addSprinklerToSelection(sprinklerName)
                 end
                 
-                OrionLib:MakeNotification({
-                    Name = "Selection Updated",
+                WindUI:Notify({
+                    Title = "Selection Updated",
                     Content = string.format("Selected (%d): %s", 
                         getSelectedSprinklersCount(), 
                         getSelectedSprinklersString()),
-                    Time = 3
+                    Duration = 3,
+                    Icon = "check-circle"
                 })
             else
-                OrionLib:MakeNotification({
-                    Name = "Selection Cleared",
+                WindUI:Notify({
+                    Title = "Selection Cleared",
                     Content = "No sprinklers selected",
-                    Time = 2
+                    Duration = 2,
+                    Icon = "x-circle"
                 })
             end
         end
@@ -360,18 +414,19 @@ local sprinklerDropdown = Tab:AddDropdown({
 })
 
 -- Select all sprinklers toggle
-Tab:AddToggle({
-    Name = "Select All Sprinkler",
-    Default = false,
+Tab:Toggle({
+    Title = "Select All Sprinkler",
+    Value = false,
     Callback = function(Value)
         if Value then
             local allSprinklers = getSprinklerTypes()
             setSelectedSprinklers(allSprinklers)
             
-            OrionLib:MakeNotification({
-                Name = "All Selected",
+            WindUI:Notify({
+                Title = "All Selected",
                 Content = string.format("Selected all %d sprinkler types", #allSprinklers),
-                Time = 3
+                Duration = 3,
+                Icon = "check-square"
             })
         else
             clearSelectedSprinklers()
@@ -380,16 +435,18 @@ Tab:AddToggle({
 })
 
 -- Delete sprinkler button
-Tab:AddButton({
-    Name = "Delete Sprinkler",
+Tab:Button({
+    Title = "Delete Sprinkler",
+    Icon = "trash-2",
     Callback = function()
         local selectedArray = getSelectedSprinklers()
         
         if #selectedArray == 0 then
-            OrionLib:MakeNotification({
-                Name = "No Selection",
+            WindUI:Notify({
+                Title = "No Selection",
                 Content = "Please select sprinkler type(s) first",
-                Time = 4
+                Duration = 4,
+                Icon = "alert-triangle"
             })
             return
         end
@@ -398,13 +455,23 @@ Tab:AddButton({
     end
 })
 
-Tab:AddSection({Name = "-PET EXPLOIT-"})
+Tab:Section({
+    Title = "-PET EXPLOIT-"
+})
+
+Tab:Paragraph({
+    Title = "How to use:",
+    Desc = "Refresh Pets > Choose Exclude Pets, ones has an X Marker in it > Auto Middle Pets",
+    Icon = "info"
+})
 
 -- Pet exclusion dropdown
-petDropdown = Tab:AddDropdown({
-    Name = "Select Pets to Exclude",
-    Default = {},
-    Options = {"None"},
+petDropdown = Tab:Dropdown({
+    Title = "Select Pets to Exclude",
+    Values = {"None"},
+    Value = {},
+    Multi = true,
+    AllowNone = true,
     Callback = function(selectedValues)
         -- Safely get current data
         local success, error = pcall(function()
@@ -455,8 +522,9 @@ if PetFunctions and PetFunctions.setPetDropdown then
 end
 
 -- Refresh and select all pets
-Tab:AddButton({
-    Name = "Refresh & Auto Select All Pets",
+Tab:Button({
+    Title = "Refresh & Auto Select All Pets",
+    Icon = "refresh-cw",
     Callback = function()
         local newPets = refreshPets()
         selectAllPets()
@@ -467,18 +535,20 @@ Tab:AddButton({
             end)
         end
         
-        OrionLib:MakeNotification({
-            Name = "Pets Refreshed & Selected",
+        WindUI:Notify({
+            Title = "Pets Refreshed & Selected",
             Content = "Found " .. #newPets .. " pets and selected all for auto middle.",
-            Time = 3
+            Duration = 3,
+            Icon = "check-circle"
         })
     end
 })
 
 -- Auto middle toggle
-Tab:AddToggle({
-    Name = "Auto Middle Pets",
-    Default = false,
+Tab:Toggle({
+    Title = "Auto Middle Pets",
+    Value = false,
+    Icon = "zap",
     Callback = function(value)
         autoMiddleEnabled = value
         if PetFunctions and PetFunctions.setAutoMiddleEnabled then
@@ -495,12 +565,16 @@ Tab:AddToggle({
     end
 })
 
-Tab:AddSection({Name = "AUTO SHOVEL"})
+Tab:Section({
+    Title = "AUTO SHOVEL"
+})
 
-cropDropdown = Tab:AddDropdown({
-    Name = "Select Crops to Monitor",
-    Default = {"All Plants"},
-    Options = safeCall(CoreFunctions.getCropTypes, "getCropTypes") or {"All Plants"},
+cropDropdown = Tab:Dropdown({
+    Title = "Select Crops to Monitor",
+    Values = safeCall(CoreFunctions.getCropTypes, "getCropTypes") or {"All Plants"},
+    Value = {""},
+    Multi = true,
+    AllowNone = true,
     Callback = function(selectedValues)
         local selectedCrops = {}
         
@@ -524,8 +598,9 @@ cropDropdown = Tab:AddDropdown({
     end
 })
 
-Tab:AddButton({
-    Name = "Refresh Crop List",
+Tab:Button({
+    Title = "Refresh Crop List",
+    Icon = "rotate-cw",
     Callback = function()
         local newCropTypes = safeCall(CoreFunctions.getCropTypes, "getCropTypes") or {"All Plants"}
         if cropDropdown and cropDropdown.Refresh then
@@ -534,92 +609,99 @@ Tab:AddButton({
             end)
         end
         
-        OrionLib:MakeNotification({
-            Name = "List Refreshed",
+        WindUI:Notify({
+            Title = "List Refreshed",
             Content = string.format("Found %d crop types", #newCropTypes - 1),
-            Time = 2
+            Duration = 2,
+            Icon = "refresh-cw"
         })
     end
 })
 
-Tab:AddTextbox({
-    Name = "Remove Fruits Below (kg)",
-    Default = tostring(safeCall(CoreFunctions.getTargetFruitWeight, "getTargetFruitWeight") or 50),
-    TextDisappear = false,
+Tab:Input({
+    Title = "Remove Fruits Below (kg)",
+    Value = tostring(safeCall(CoreFunctions.getTargetFruitWeight, "getTargetFruitWeight") or 50),
+    Placeholder = "Enter weight threshold",
+    InputIcon = "weight",
     Callback = function(value)
         local weight = tonumber(value)
         if weight and weight > 0 then
             local success = safeCall(CoreFunctions.setTargetFruitWeight, "setTargetFruitWeight", weight)
             if success then
-                OrionLib:MakeNotification({
-                    Name = "Weight Updated",
+                WindUI:Notify({
+                    Title = "Weight Updated",
                     Content = string.format("Target weight set to %.1fkg", weight),
-                    Time = 2
+                    Duration = 2,
+                    Icon = "check"
                 })
             end
         else
-            OrionLib:MakeNotification({
-                Name = "Invalid Weight",
+            WindUI:Notify({
+                Title = "Invalid Weight",
                 Content = "Please enter a valid number above 0",
-                Time = 3
+                Duration = 3,
+                Icon = "alert-triangle"
             })
         end
     end
 })
 
-Tab:AddToggle({
-    Name = "Enable Auto Shovel",
-    Default = safeCall(CoreFunctions.getAutoShovelStatus, "getAutoShovelStatus") or false,
+Tab:Toggle({
+    Title = "Enable Auto Shovel",
+    Value = safeCall(CoreFunctions.getAutoShovelStatus, "getAutoShovelStatus") or false,
+    Icon = "shovel",
     Callback = function(enabled)
         local success, message = safeCall(CoreFunctions.toggleAutoShovel, "toggleAutoShovel", enabled)
         if success and message then
-            OrionLib:MakeNotification({
-                Name = "Auto Shovel",
+            WindUI:Notify({
+                Title = "Auto Shovel",
                 Content = message,
-                Time = 2
+                Duration = 2,
+                Icon = enabled and "check-circle" or "x-circle"
             })
         end
     end
 })
 
--- SHOP TAB
-local ShopTab = Window:MakeTab({
-    Name = "Shop",
-    Icon = "rbxassetid://6031280882",
-    PremiumOnly = false
+-- ===========================================
+-- SHOP TAB (Updated for WindUI)
+-- ===========================================
+local ShopTab = Window:Tab({
+    Title = "Shop",
+    Icon = "shopping-cart",
+    Desc = "Auto buy system for various shop items"
 })
 
-ShopTab:AddParagraph("Auto Buy", "Auto Buy, Buy even AFK")
-
--- ===========================================
--- SHOP TAB CREATION
--- ===========================================
-
-ShopTab:AddSection({
-    Name = "-Zen Shop-"
+ShopTab:Paragraph({
+    Title = "Auto Buy System",
+    Desc = "Automatically purchase items even while AFK",
+    Icon = "shopping-cart"
 })
 
--- Zen Items Multi-Select Dropdown
+-- Zen Shop Section
+ShopTab:Divider()
+
 local zenItemOptions = {"None"}
-if AutoBuy.zenItems and type(AutoBuy.zenItems) == "table" then
+if AutoBuy and AutoBuy.zenItems and type(AutoBuy.zenItems) == "table" then
     for _, item in pairs(AutoBuy.zenItems) do
         table.insert(zenItemOptions, item)
     end
 end
 
-ShopTab:AddDropdown({
-    Name = "Select Zen Items to Auto Buy",
-    Default = {},
-    Options = zenItemOptions,
+ShopTab:Dropdown({
+    Title = "Select Zen Items",
+    Desc = "Choose zen items to auto buy",
+    Values = zenItemOptions,
+    Multi = true,
+    AllowNone = true,
+    Value = {},
     Callback = function(selectedValues)
         local success, error = pcall(function()
-            if AutoBuy.setSelectedZenItems and type(AutoBuy.setSelectedZenItems) == "function" then
+            if AutoBuy and AutoBuy.setSelectedZenItems and type(AutoBuy.setSelectedZenItems) == "function" then
                 local count = AutoBuy.setSelectedZenItems(selectedValues)
                 if count > 0 then
-                    print("Selected " .. count .. " zen items for auto buy")
+                    notify("Zen Items", "Selected " .. count .. " zen items for auto buy", 3)
                 end
-            else
-                warn("AutoBuy.setSelectedZenItems is not a function")
             end
         end)
         if not success then
@@ -628,56 +710,45 @@ ShopTab:AddDropdown({
     end
 })
 
-ShopTab:AddToggle({
-    Name = "Auto Buy Zen",
-    Default = false,
+ShopTab:Toggle({
+    Title = "Auto Buy Zen Items",
+    Desc = "Automatically purchase selected zen items",
+    Icon = "zap",
+    Value = false,
     Callback = function(Value)
-        if AutoBuy.buySelectedZenItems and type(AutoBuy.buySelectedZenItems) == "function" then
+        if AutoBuy and AutoBuy.buySelectedZenItems and type(AutoBuy.buySelectedZenItems) == "function" then
             AutoBuy.buySelectedZenItems(Value)
-        else
-            warn("AutoBuy.buySelectedZenItems is not a function")
-        end
-        
-        if Value then
-            OrionLib:MakeNotification({
-                Name = "Auto Buy Zen",
-                Content = "Zen auto buy enabled!",
-                Image = "rbxassetid://4483345998",
-                Time = 3
-            })
+            if Value then
+                notify("Auto Buy", "Zen auto buy enabled!", 3)
+            end
         end
     end
 })
 
--- ===========================================
--- TRAVELING MERCHANT SECTION
--- ===========================================
+-- Traveling Merchant Section
+ShopTab:Divider()
 
-ShopTab:AddSection({
-    Name = "-Traveling Merchant-"
-})
-
--- Merchant Items Multi-Select Dropdown
 local merchantItemOptions = {"None"}
-if AutoBuy.merchantItems and type(AutoBuy.merchantItems) == "table" then
+if AutoBuy and AutoBuy.merchantItems and type(AutoBuy.merchantItems) == "table" then
     for _, item in pairs(AutoBuy.merchantItems) do
         table.insert(merchantItemOptions, item)
     end
 end
 
-ShopTab:AddDropdown({
-    Name = "Select Merchant Items to Auto Buy",
-    Default = {},
-    Options = merchantItemOptions,
+ShopTab:Dropdown({
+    Title = "Select Merchant Items",
+    Desc = "Choose merchant items to auto buy",
+    Values = merchantItemOptions,
+    Multi = true,
+    AllowNone = true,
+    Value = {},
     Callback = function(selectedValues)
         local success, error = pcall(function()
-            if AutoBuy.setSelectedMerchantItems and type(AutoBuy.setSelectedMerchantItems) == "function" then
+            if AutoBuy and AutoBuy.setSelectedMerchantItems and type(AutoBuy.setSelectedMerchantItems) == "function" then
                 local count = AutoBuy.setSelectedMerchantItems(selectedValues)
                 if count > 0 then
-                    print("Selected " .. count .. " merchant items for auto buy")
+                    notify("Merchant Items", "Selected " .. count .. " merchant items for auto buy", 3)
                 end
-            else
-                warn("AutoBuy.setSelectedMerchantItems is not a function")
             end
         end)
         if not success then
@@ -686,49 +757,38 @@ ShopTab:AddDropdown({
     end
 })
 
-ShopTab:AddToggle({
-    Name = "Auto Buy Merchant",
-    Default = false,
+ShopTab:Toggle({
+    Title = "Auto Buy Merchant Items",
+    Desc = "Automatically purchase selected merchant items",
+    Icon = "user",
+    Value = false,
     Callback = function(Value)
-        if AutoBuy.buySelectedMerchantItems and type(AutoBuy.buySelectedMerchantItems) == "function" then
+        if AutoBuy and AutoBuy.buySelectedMerchantItems and type(AutoBuy.buySelectedMerchantItems) == "function" then
             AutoBuy.buySelectedMerchantItems(Value)
-        else
-            warn("AutoBuy.buySelectedMerchantItems is not a function")
-        end
-        
-        if Value then
-            OrionLib:MakeNotification({
-                Name = "Auto Buy Merchant",
-                Content = "Merchant auto buy enabled!",
-                Image = "rbxassetid://4483345998",
-                Time = 3
-            })
+            if Value then
+                notify("Auto Buy", "Merchant auto buy enabled!", 3)
+            end
         end
     end
 })
 
--- ===========================================
--- EGG SECTION
--- ===========================================
+-- Pet Eggs Section
+ShopTab:Divider()
 
-ShopTab:AddSection({
-    Name = "-Pet Eggs-"
-})
-
--- Egg Multi-Select Dropdown
-ShopTab:AddDropdown({
-    Name = "Select Eggs to Auto Buy",
-    Default = {},
-    Options = AutoBuy.eggOptions or {"None"},
+ShopTab:Dropdown({
+    Title = "Select Eggs to Auto Buy",
+    Desc = "Choose eggs to automatically purchase",
+    Values = (AutoBuy and AutoBuy.eggOptions) or {"None"},
+    Multi = true,
+    AllowNone = true,
+    Value = {},
     Callback = function(selectedValues)
         local success, error = pcall(function()
-            if AutoBuy.setSelectedEggs and type(AutoBuy.setSelectedEggs) == "function" then
+            if AutoBuy and AutoBuy.setSelectedEggs and type(AutoBuy.setSelectedEggs) == "function" then
                 local count = AutoBuy.setSelectedEggs(selectedValues)
                 if count > 0 then
-                    print("Selected " .. count .. " eggs for auto buy")
+                    notify("Eggs", "Selected " .. count .. " eggs for auto buy", 3)
                 end
-            else
-                warn("AutoBuy.setSelectedEggs is not a function")
             end
         end)
         if not success then
@@ -737,50 +797,38 @@ ShopTab:AddDropdown({
     end
 })
 
--- Auto Buy Egg Toggle
-ShopTab:AddToggle({
-    Name = "Auto Buy Eggs",
-    Default = false,
+ShopTab:Toggle({
+    Title = "Auto Buy Eggs",
+    Desc = "Automatically purchase selected eggs",
+    Icon = "egg",
+    Value = false,
     Callback = function(value)
-        if AutoBuy.toggleEgg and type(AutoBuy.toggleEgg) == "function" then
+        if AutoBuy and AutoBuy.toggleEgg and type(AutoBuy.toggleEgg) == "function" then
             AutoBuy.toggleEgg(value)
-        else
-            warn("AutoBuy.toggleEgg is not a function")
-        end
-        
-        if value then
-            OrionLib:MakeNotification({
-                Name = "Auto Buy Eggs",
-                Content = "Auto Buy Eggs enabled!",
-                Image = "rbxassetid://4483345998",
-                Time = 2
-            })
+            if value then
+                notify("Auto Buy", "Auto Buy Eggs enabled!", 2)
+            end
         end
     end
 })
 
--- ===========================================
--- SEED SECTION
--- ===========================================
+-- Seeds Section
+ShopTab:Divider()
 
-ShopTab:AddSection({
-    Name = "-Seeds-"
-})
-
--- Seed Multi-Select Dropdown
-ShopTab:AddDropdown({
-    Name = "Select Seeds to Auto Buy",
-    Default = {},
-    Options = AutoBuy.seedOptions or {"None"},
+ShopTab:Dropdown({
+    Title = "Select Seeds to Auto Buy",
+    Desc = "Choose seeds to automatically purchase",
+    Values = (AutoBuy and AutoBuy.seedOptions) or {"None"},
+    Multi = true,
+    AllowNone = true,
+    Value = {},
     Callback = function(selectedValues)
         local success, error = pcall(function()
-            if AutoBuy.setSelectedSeeds and type(AutoBuy.setSelectedSeeds) == "function" then
+            if AutoBuy and AutoBuy.setSelectedSeeds and type(AutoBuy.setSelectedSeeds) == "function" then
                 local count = AutoBuy.setSelectedSeeds(selectedValues)
                 if count > 0 then
-                    print("Selected " .. count .. " seeds for auto buy")
+                    notify("Seeds", "Selected " .. count .. " seeds for auto buy", 3)
                 end
-            else
-                warn("AutoBuy.setSelectedSeeds is not a function")
             end
         end)
         if not success then
@@ -789,50 +837,38 @@ ShopTab:AddDropdown({
     end
 })
 
--- Auto Buy Seed Toggle
-ShopTab:AddToggle({
-    Name = "Auto Buy Seeds",
-    Default = false,
+ShopTab:Toggle({
+    Title = "Auto Buy Seeds",
+    Desc = "Automatically purchase selected seeds",
+    Icon = "sprout",
+    Value = false,
     Callback = function(value)
-        if AutoBuy.toggleSeed and type(AutoBuy.toggleSeed) == "function" then
+        if AutoBuy and AutoBuy.toggleSeed and type(AutoBuy.toggleSeed) == "function" then
             AutoBuy.toggleSeed(value)
-        else
-            warn("AutoBuy.toggleSeed is not a function")
-        end
-        
-        if value then
-            OrionLib:MakeNotification({
-                Name = "Auto Buy Seeds",
-                Content = "Auto Buy Seeds enabled!",
-                Image = "rbxassetid://4483345998",
-                Time = 2
-            })
+            if value then
+                notify("Auto Buy", "Auto Buy Seeds enabled!", 2)
+            end
         end
     end
 })
 
--- ===========================================
--- GEAR SECTION
--- ===========================================
+-- Gear & Tools Section
+ShopTab:Divider()
 
-ShopTab:AddSection({
-    Name = "-Gear & Tools-"
-})
-
--- Gear Multi-Select Dropdown
-ShopTab:AddDropdown({
-    Name = "Select Gear to Auto Buy",
-    Default = {},
-    Options = AutoBuy.gearOptions or {"None"},
+ShopTab:Dropdown({
+    Title = "Select Gear to Auto Buy",
+    Desc = "Choose gear items to automatically purchase",
+    Values = (AutoBuy and AutoBuy.gearOptions) or {"None"},
+    Multi = true,
+    AllowNone = true,
+    Value = {},
     Callback = function(selectedValues)
         local success, error = pcall(function()
-            if AutoBuy.setSelectedGear and type(AutoBuy.setSelectedGear) == "function" then
+            if AutoBuy and AutoBuy.setSelectedGear and type(AutoBuy.setSelectedGear) == "function" then
                 local count = AutoBuy.setSelectedGear(selectedValues)
                 if count > 0 then
-                    print("Selected " .. count .. " gear items for auto buy")
+                    notify("Gear", "Selected " .. count .. " gear items for auto buy", 3)
                 end
-            else
-                warn("AutoBuy.setSelectedGear is not a function")
             end
         end)
         if not success then
@@ -841,47 +877,44 @@ ShopTab:AddDropdown({
     end
 })
 
--- Auto Buy Gear Toggle
-ShopTab:AddToggle({
-    Name = "Auto Buy Gear",
-    Default = false,
+ShopTab:Toggle({
+    Title = "Auto Buy Gear",
+    Desc = "Automatically purchase selected gear",
+    Icon = "wrench",
+    Value = false,
     Callback = function(value)
-        if AutoBuy.toggleGear and type(AutoBuy.toggleGear) == "function" then
+        if AutoBuy and AutoBuy.toggleGear and type(AutoBuy.toggleGear) == "function" then
             AutoBuy.toggleGear(value)
-        else
-            warn("AutoBuy.toggleGear is not a function")
-        end
-        
-        if value then
-            OrionLib:MakeNotification({
-                Name = "Auto Buy Gear",
-                Content = "Auto Buy Gear enabled!",
-                Image = "rbxassetid://4483345998",
-                Time = 2
-            })
+            if value then
+                notify("Auto Buy", "Auto Buy Gear enabled!", 2)
+            end
         end
     end
 })
 
--- Initialize the AutoBuy module
-if AutoBuy.init and type(AutoBuy.init) == "function" then
+-- Initialize AutoBuy module
+if AutoBuy and AutoBuy.init and type(AutoBuy.init) == "function" then
     AutoBuy.init()
-else
-    warn("AutoBuy.init is not a function or doesn't exist")
 end
-
--- MISC TAB
-local MiscTab = Window:MakeTab({
-    Name = "Misc",
-    Icon = "rbxassetid://6031280882",
-    PremiumOnly = false
+-- ===========================================
+-- MISC TAB (Updated for WindUI)
+-- ===========================================
+local MiscTab = Window:Tab({
+    Title = "Misc",
+    Icon = "settings",
+    Desc = "Performance optimization and miscellaneous features"
 })
 
-MiscTab:AddParagraph("Performance", "Reduce game lag by removing lag-causing objects.")
+MiscTab:Paragraph({
+    Title = "Lag Reduction",
+    Desc = "Remove lag-causing objects to improve game performance",
+    Icon = "zap"
+})
 
--- Reduce lag
-MiscTab:AddButton({
-    Name = "Reduce Lag",
+MiscTab:Button({
+    Title = "Reduce Lag",
+    Desc = "Remove all lag-causing objects from workspace",
+    Icon = "trash-2",
     Callback = function()
         local success, error = pcall(function()
             repeat
@@ -894,48 +927,58 @@ MiscTab:AddButton({
         end)
         
         if success then
-            OrionLib:MakeNotification({
-                Name = "Lag Reduced",
-                Content = "All lag objects have been removed.",
-                Time = 3
-            })
+            notify("Performance", "All lag objects have been removed", 3)
         else
-            warn("Failed to reduce lag: " .. tostring(error))
+            notify("Error", "Failed to reduce lag: " .. tostring(error), 5)
         end
     end
 })
 
--- Remove farms
-MiscTab:AddButton({
-    Name = "Remove Farms (Stay close to your farm)",
+MiscTab:Button({
+    Title = "Remove Farms",
+    Desc = "Remove other players' farms (stay close to your farm)",
+    Icon = "x-circle",
     Callback = function()
         removeFarms()
+        notify("Farms", "Farm removal initiated", 2)
     end
 })
 
--- SOCIAL TAB
-local SocialTab = Window:MakeTab({
-    Name = "Social",
-    Icon = "rbxassetid://6031075938",
-    PremiumOnly = false
+-- ===========================================
+-- SOCIAL TAB (Updated for WindUI)
+-- ===========================================
+local SocialTab = Window:Tab({
+    Title = "Social",
+    Icon = "users",
+    Desc = "Social media links and community features"
 })
 
-SocialTab:AddParagraph("TIKTOK", "@yurahaxyz        |        @yurahayz")
-SocialTab:AddParagraph("YOUTUBE", "YUraxYZ")
+SocialTab:Paragraph({
+    Title = "TikTok",
+    Desc = "@yurahaxyz | @yurahayz",
+    Icon = "music",
+    Color = "Blue"
+})
 
--- Discord button
-SocialTab:AddButton({
-    Name = "GAGSL Community Discord",
+SocialTab:Paragraph({
+    Title = "YouTube",
+    Desc = "YUraxYZ",
+    Icon = "play",
+    Color = "Red"
+})
+
+SocialTab:Divider()
+
+SocialTab:Button({
+    Title = "Join Discord Community",
+    Desc = "Copy Discord invite link to clipboard",
+    Icon = "copy",
     Callback = function()
         if setclipboard then
             setclipboard("https://discord.gg/gpR7YQjnFt")
-            OrionLib:MakeNotification({
-                Name = "Copied!",
-                Content = "Discord invite copied to clipboard.",
-                Time = 3
-            })
+            notify("Success", "Discord invite copied to clipboard!", 3)
         else
-            warn("Clipboard access not available.")
+            notify("Error", "Clipboard access not available", 3)
         end
     end
 })
@@ -948,8 +991,4 @@ Players.PlayerRemoving:Connect(function(playerLeaving)
 end)
 
 -- Final notification
-OrionLib:MakeNotification({
-    Name = "GAGSL Hub Loaded",
-    Content = "GAGSL Hub loaded with +999 Pogi Points!",
-    Time = 4
-})
+notify("GAGSL Hub", "Wind UI version loaded successfully! +999 Pogi Points!", 4)
