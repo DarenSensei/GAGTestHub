@@ -840,13 +840,6 @@ local autoBuyGearToggle = Tab:AddToggle({
     end
 })
 
--- ========================================
--- START AUTO BUY LOOP
--- ========================================
-
--- Start the auto buy loop
-AutoBuy.startLoop()
-
 -- MISC TAB
 local MiscTab = Window:MakeTab({
     Name = "Misc",
