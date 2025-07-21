@@ -1,10 +1,45 @@
 -- Main GAGSL Hub Script (FIXED & OPTIMIZED)
 repeat task.wait() until game:IsLoaded()
 
--- Load external functions
-local CoreFunctions = loadstring(game:HttpGet("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/CoreFunctions.lua"))()
-local PetFunctions = loadstring(game:HttpGet("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/PetMiddleFunctions.lua"))()
-local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/YuraScripts/GrowAFilipinoy/refs/heads/main/TEST.lua"))()
+-- Safe loading function with error handling
+local function safeLoad(url, name)
+    local success, result = pcall(function()
+        local response = game:HttpGet(url)
+        if not response or response == "" then
+            error("Empty response from " .. name)
+        end
+        local loadedFunction = loadstring(response)
+        if not loadedFunction then
+            error("Failed to compile " .. name)
+        end
+        return loadedFunction()
+    end)
+    
+    if not success then
+        warn("Failed to load " .. name .. ": " .. tostring(result))
+        return nil
+    end
+    
+    return result
+end
+
+-- Load external functions with error handling
+local CoreFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/CoreFunctions.lua", "CoreFunctions")
+local PetFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/PetMiddleFunctions.lua", "PetFunctions")
+local OrionLib = safeLoad("https://raw.githubusercontent.com/YuraScripts/GrowAFilipinoy/refs/heads/main/TEST.lua", "OrionLib")
+
+-- Check if all dependencies loaded successfully
+if not CoreFunctions then
+    error("Failed to load CoreFunctions - script cannot continue")
+end
+
+if not PetFunctions then
+    error("Failed to load PetFunctions - script cannot continue")
+end
+
+if not OrionLib then
+    error("Failed to load OrionLib - script cannot continue")
+end
 
 -- Services
 local Players = game:GetService("Players")
@@ -47,41 +82,63 @@ local Window = OrionLib:MakeWindow({
 
 -- Fade in animation
 local function fadeInMainTab()
-    local screenGui = player:WaitForChild("PlayerGui"):WaitForChild("Orion")
-    local mainFrame = screenGui:WaitForChild("Main")
-    mainFrame.BackgroundTransparency = 1
+    local success, error = pcall(function()
+        local screenGui = player:WaitForChild("PlayerGui"):WaitForChild("Orion")
+        local mainFrame = screenGui:WaitForChild("Main")
+        mainFrame.BackgroundTransparency = 1
 
-    local tween = TweenService:Create(
-        mainFrame,
-        TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        { BackgroundTransparency = 0.2 }
-    )
-    tween:Play()
+        local tween = TweenService:Create(
+            mainFrame,
+            TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            { BackgroundTransparency = 0.2 }
+        )
+        tween:Play()
+    end)
+    
+    if not success then
+        warn("Failed to create fade animation: " .. tostring(error))
+    end
 end
 
 task.delay(1.5, fadeInMainTab)
 
+-- Safe function call wrapper
+local function safeCall(func, funcName, ...)
+    if not func then
+        warn(funcName .. " function not available")
+        return nil
+    end
+    
+    local success, result = pcall(func, ...)
+    if not success then
+        warn("Error calling " .. funcName .. ": " .. tostring(result))
+        return nil
+    end
+    
+    return result
+end
+
 -- FIXED: Sprinkler helper functions using CoreFunctions
 local function getSprinklerTypes()
-    return CoreFunctions.getSprinklerTypes()
+    return safeCall(CoreFunctions.getSprinklerTypes, "getSprinklerTypes") or sprinklerTypes
 end
 
 local function setSelectedSprinklers(selected)
     selectedSprinklers = selected
-    CoreFunctions.setSelectedSprinklers(selected)
+    safeCall(CoreFunctions.setSelectedSprinklers, "setSelectedSprinklers", selected)
 end
 
 local function getSelectedSprinklers()
-    return CoreFunctions.getSelectedSprinklers()
+    return safeCall(CoreFunctions.getSelectedSprinklers, "getSelectedSprinklers") or selectedSprinklers
 end
 
 local function clearSelectedSprinklers()
     selectedSprinklers = {}
-    CoreFunctions.clearSelectedSprinklers()
+    safeCall(CoreFunctions.clearSelectedSprinklers, "clearSelectedSprinklers")
 end
 
 local function addSprinklerToSelection(sprinklerName)
-    local success = CoreFunctions.addSprinklerToSelection(sprinklerName)
+    local success = safeCall(CoreFunctions.addSprinklerToSelection, "addSprinklerToSelection", sprinklerName)
     if success then
         table.insert(selectedSprinklers, sprinklerName)
     end
@@ -89,54 +146,54 @@ local function addSprinklerToSelection(sprinklerName)
 end
 
 local function getSelectedSprinklersCount()
-    return CoreFunctions.getSelectedSprinklersCount()
+    return safeCall(CoreFunctions.getSelectedSprinklersCount, "getSelectedSprinklersCount") or #selectedSprinklers
 end
 
 local function getSelectedSprinklersString()
-    return CoreFunctions.getSelectedSprinklersString()
+    return safeCall(CoreFunctions.getSelectedSprinklersString, "getSelectedSprinklersString") or table.concat(selectedSprinklers, ", ")
 end
 
 -- Pet helper functions
 local function refreshPets()
-    return PetFunctions.refreshPets()
+    return safeCall(PetFunctions.refreshPets, "refreshPets") or {}
 end
 
 local function updatePetCount()
-    PetFunctions.updatePetCount()
+    safeCall(PetFunctions.updatePetCount, "updatePetCount")
 end
 
 local function selectAllPets()
-    PetFunctions.selectAllPets()
+    safeCall(PetFunctions.selectAllPets, "selectAllPets")
     allPetsSelected = true
 end
 
 local function createESPMarker(pet)
-    PetFunctions.createESPMarker(pet)
+    safeCall(PetFunctions.createESPMarker, "createESPMarker", pet)
 end
 
 local function removeESPMarker(petId)
-    PetFunctions.removeESPMarker(petId)
+    safeCall(PetFunctions.removeESPMarker, "removeESPMarker", petId)
 end
 
 local function autoEquipShovel()
-    CoreFunctions.autoEquipShovel()
+    safeCall(CoreFunctions.autoEquipShovel, "autoEquipShovel")
 end
 
 local function deleteSprinklers()
-    CoreFunctions.deleteSprinklers(selectedSprinklers, OrionLib)
+    safeCall(CoreFunctions.deleteSprinklers, "deleteSprinklers", selectedSprinklers, OrionLib)
 end
 
 local function setupZoneAbilityListener()
-    PetFunctions.setupZoneAbilityListener()
+    safeCall(PetFunctions.setupZoneAbilityListener, "setupZoneAbilityListener")
 end
 
 local function startInitialLoop()
-    PetFunctions.startInitialLoop()
+    safeCall(PetFunctions.startInitialLoop, "startInitialLoop")
 end
 
 local function cleanup()
-    PetFunctions.cleanup()
-    CoreFunctions.cleanup()
+    safeCall(PetFunctions.cleanup, "PetFunctions.cleanup")
+    safeCall(CoreFunctions.cleanup, "CoreFunctions.cleanup")
     if buyConnection then
         buyConnection:Disconnect()
         buyConnection = nil
@@ -148,15 +205,15 @@ local function cleanup()
 end
 
 local function buyAllZenItems()
-    CoreFunctions.buyAllZenItems()
+    safeCall(CoreFunctions.buyAllZenItems, "buyAllZenItems")
 end
 
 local function buyAllMerchantItems()
-    CoreFunctions.buyAllMerchantItems()
+    safeCall(CoreFunctions.buyAllMerchantItems, "buyAllMerchantItems")
 end
 
 local function removeFarms()
-    CoreFunctions.removeFarms(OrionLib)
+    safeCall(CoreFunctions.removeFarms, "removeFarms", OrionLib)
 end
 
 -- MAIN TAB
@@ -177,7 +234,12 @@ ToolsTab:AddTextbox({
     PlaceholderText = "Paste Job ID & press Enter",
     Callback = function(jobId)
         if jobId and jobId ~= "" then
-            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, jobId, player)
+            local success, error = pcall(function()
+                game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, jobId, player)
+            end)
+            if not success then
+                warn("Failed to teleport: " .. tostring(error))
+            end
         end
     end
 })
@@ -203,7 +265,12 @@ ToolsTab:AddButton({
 ToolsTab:AddButton({
     Name = "Rejoin Server",
     Callback = function()
-        game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+        local success, error = pcall(function()
+            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+        end)
+        if not success then
+            warn("Failed to rejoin: " .. tostring(error))
+        end
     end
 })
 
@@ -211,7 +278,7 @@ ToolsTab:AddButton({
 ToolsTab:AddButton({
     Name = "Server Hop",
     Callback = function()
-        local foundServer, playerCount = CoreFunctions.serverHop()
+        local foundServer, playerCount = safeCall(CoreFunctions.serverHop, "serverHop")
         if foundServer then
             OrionLib:MakeNotification({
                 Name = "Server Found",
@@ -219,7 +286,12 @@ ToolsTab:AddButton({
                 Time = 3
             })
             task.wait(3)
-            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, foundServer, player)
+            local success, error = pcall(function()
+                game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, foundServer, player)
+            end)
+            if not success then
+                warn("Failed to server hop: " .. tostring(error))
+            end
         else
             OrionLib:MakeNotification({
                 Name = "No Servers",
@@ -334,7 +406,9 @@ Tab:AddButton({
 Tab:AddParagraph("Pet Exploit", "Auto Middle Pets, Select Pet to Exclude.")
 
 petCountLabel = Tab:AddLabel("Pets Found: 0 | Selected: 0 | Excluded: 0")
-PetFunctions.setPetCountLabel(petCountLabel)
+if PetFunctions and PetFunctions.setPetCountLabel then
+    PetFunctions.setPetCountLabel(petCountLabel)
+end
 
 updatePetCount()
 task.spawn(function()
@@ -350,8 +424,10 @@ petDropdown = Tab:AddDropdown({
     Default = {},
     Options = {"None"},
     Callback = function(selectedValues)
-        excludedPets = PetFunctions.getExcludedPets()
-        currentPetsList = PetFunctions.getCurrentPetsList()
+        if PetFunctions then
+            excludedPets = safeCall(PetFunctions.getExcludedPets, "getExcludedPets") or {}
+            currentPetsList = safeCall(PetFunctions.getCurrentPetsList, "getCurrentPetsList") or {}
+        end
         
         for petId, _ in pairs(excludedPets) do
             removeESPMarker(petId)
@@ -378,7 +454,9 @@ petDropdown = Tab:AddDropdown({
             end
         end
         
-        PetFunctions.setExcludedPets(excludedPets)
+        if PetFunctions and PetFunctions.setExcludedPets then
+            PetFunctions.setExcludedPets(excludedPets)
+        end
         updatePetCount()
         
         local excludedCount = 0
@@ -396,7 +474,9 @@ petDropdown = Tab:AddDropdown({
     end
 })
 
-PetFunctions.setPetDropdown(petDropdown)
+if PetFunctions and PetFunctions.setPetDropdown then
+    PetFunctions.setPetDropdown(petDropdown)
+end
 
 -- Refresh and select all pets
 Tab:AddButton({
@@ -424,7 +504,9 @@ Tab:AddToggle({
     Default = false,
     Callback = function(value)
         autoMiddleEnabled = value
-        PetFunctions.setAutoMiddleEnabled(value)
+        if PetFunctions and PetFunctions.setAutoMiddleEnabled then
+            PetFunctions.setAutoMiddleEnabled(value)
+        end
         if value then
             setupZoneAbilityListener()
             startInitialLoop()
@@ -434,15 +516,21 @@ Tab:AddToggle({
     end
 })
 
--- Auto Shovel Section - FIXED
-Tab:AddParagraph("Auto Shovel Crops", "Automatically shovel crops based on weight threshold.")
+-- Auto Shovel Section - Create the tab first
+local AutoShovelTab = Window:MakeTab({
+    Name = "Auto Shovel",
+    Icon = "rbxassetid://6031280882",
+    PremiumOnly = false
+})
+
+AutoShovelTab:AddParagraph("Auto Shovel Crops", "Automatically shovel crops based on weight threshold.")
 
 AutoShovelTab:AddSection({Name = "Crop Selection"})
 
 cropDropdown = AutoShovelTab:AddDropdown({
     Name = "Select Crops to Monitor",
     Default = {"All Plants"},
-    Options = CoreFunctions.getCropTypes(),
+    Options = safeCall(CoreFunctions.getCropTypes, "getCropTypes") or {"All Plants"},
     Callback = function(selectedValues)
         local selectedCrops = {}
         
@@ -462,15 +550,17 @@ cropDropdown = AutoShovelTab:AddDropdown({
             end
         end
         
-        CoreFunctions.setSelectedCrops(selectedCrops)
+        safeCall(CoreFunctions.setSelectedCrops, "setSelectedCrops", selectedCrops)
     end
 })
 
 AutoShovelTab:AddButton({
     Name = "Refresh Crop List",
     Callback = function()
-        local newCropTypes = CoreFunctions.getCropTypes()
-        cropDropdown:Refresh(newCropTypes, true)
+        local newCropTypes = safeCall(CoreFunctions.getCropTypes, "getCropTypes") or {"All Plants"}
+        if cropDropdown and cropDropdown.Refresh then
+            cropDropdown:Refresh(newCropTypes, true)
+        end
         
         OrionLib:MakeNotification({
             Name = "List Refreshed",
@@ -485,16 +575,19 @@ AutoShovelTab:AddSection({Name = "Weight Settings"})
 
 AutoShovelTab:AddTextbox({
     Name = "Remove Fruits Below (kg)",
-    Default = tostring(CoreFunctions.getTargetFruitWeight()),
+    Default = tostring(safeCall(CoreFunctions.getTargetFruitWeight, "getTargetFruitWeight") or 50),
     TextDisappear = false,
     Callback = function(value)
         local weight = tonumber(value)
-        if CoreFunctions.setTargetFruitWeight(weight) then
-            OrionLib:MakeNotification({
-                Name = "Weight Updated",
-                Content = string.format("Target weight set to %.1fkg", weight),
-                Time = 2
-            })
+        if weight and weight > 0 then
+            local success = safeCall(CoreFunctions.setTargetFruitWeight, "setTargetFruitWeight", weight)
+            if success then
+                OrionLib:MakeNotification({
+                    Name = "Weight Updated",
+                    Content = string.format("Target weight set to %.1fkg", weight),
+                    Time = 2
+                })
+            end
         else
             OrionLib:MakeNotification({
                 Name = "Invalid Weight",
@@ -510,9 +603,17 @@ AutoShovelTab:AddSection({Name = "Auto Shovel Control"})
 
 AutoShovelTab:AddToggle({
     Name = "Enable Auto Shovel",
-    Default = CoreFunctions.getAutoShovelStatus(),
+    Default = safeCall(CoreFunctions.getAutoShovelStatus, "getAutoShovelStatus") or false,
     Callback = function(enabled)
-        local success, message = CoreFunctions.toggleAutoShovel(enabled)
+        local success, message = safeCall(CoreFunctions.toggleAutoShovel, "toggleAutoShovel", enabled)
+        if success and message then
+            OrionLib:MakeNotification({
+                Name = "Auto Shovel",
+                Content = message,
+                Time = 2
+            })
+        end
+    end
 })
 
 -- SHOP TAB
@@ -527,7 +628,7 @@ ShopTab:AddToggle({
     Name = "Auto Buy Zen",
     Default = false,
     Callback = function(Value)
-        CoreFunctions.toggleAutoBuyZen(Value)
+        safeCall(CoreFunctions.toggleAutoBuyZen, "toggleAutoBuyZen", Value)
         
         if Value then
             OrionLib:MakeNotification({
@@ -544,7 +645,7 @@ ShopTab:AddToggle({
     Name = "Auto Buy Traveling Merchants",
     Default = false,
     Callback = function(Value)
-        CoreFunctions.toggleAutoBuyMerchant(Value)
+        safeCall(CoreFunctions.toggleAutoBuyMerchant, "toggleAutoBuyMerchant", Value)
         
         if Value then
             OrionLib:MakeNotification({
@@ -572,19 +673,25 @@ MiscTab:AddParagraph("Performance", "Reduce game lag by removing lag-causing obj
 MiscTab:AddButton({
     Name = "Reduce Lag",
     Callback = function()
-        repeat
-            local lag = game.Workspace:findFirstChild("Lag", true)
-            if (lag ~= nil) then
-                lag:remove()
-            end
-            wait()
-        until (game.Workspace:findFirstChild("Lag", true) == nil)
+        local success, error = pcall(function()
+            repeat
+                local lag = game.Workspace:findFirstChild("Lag", true)
+                if (lag ~= nil) then
+                    lag:remove()
+                end
+                wait()
+            until (game.Workspace:findFirstChild("Lag", true) == nil)
+        end)
         
-        OrionLib:MakeNotification({
-            Name = "Lag Reduced",
-            Content = "All lag objects have been removed.",
-            Time = 3
-        })
+        if success then
+            OrionLib:MakeNotification({
+                Name = "Lag Reduced",
+                Content = "All lag objects have been removed.",
+                Time = 3
+            })
+        else
+            warn("Failed to reduce lag: " .. tostring(error))
+        end
     end
 })
 
@@ -610,18 +717,22 @@ SocialTab:AddParagraph("YOUTUBE", "YUraxYZ")
 SocialTab:AddButton({
     Name = "Yura Community Discord",
     Callback = function()
-        setclipboard("https://discord.gg/gpR7YQjnFt")
-        OrionLib:MakeNotification({
-            Name = "Copied!",
-            Content = "Discord invite copied to clipboard.",
-            Time = 3
-        })
+        if setclipboard then
+            setclipboard("https://discord.gg/gpR7YQjnFt")
+            OrionLib:MakeNotification({
+                Name = "Copied!",
+                Content = "Discord invite copied to clipboard.",
+                Time = 3
+            })
+        else
+            warn("Clipboard access not available.")
+        end
     end
 })
 
 -- Cleanup on exit
-Players.PlayerRemoving:Connect(function(player)
-    if player == Players.LocalPlayer then
+Players.PlayerRemoving:Connect(function(playerLeaving)
+    if playerLeaving == Players.LocalPlayer then
         cleanup()
     end
 end)
