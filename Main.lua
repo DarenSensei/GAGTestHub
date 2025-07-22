@@ -31,10 +31,9 @@ if not WindUI then
 end
 
 -- Load external functions with error handling
-local CoreFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/CoreFunctions.lua", "CoreFunctions")
+local CoreFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/CoreFunctions.lua", "CoreFunctions")
 local PetFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/PetMiddleFunctions.lua", "PetFunctions")
-local AutoBuy = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/AutoBuy.lua", "AutoBuy")
-
+local AutoBuy = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/AutoBuy.lua", "AutoBuy")
 -- Check if all dependencies loaded successfully
 if not CoreFunctions then
     error("Failed to load CoreFunctions - script cannot continue")
@@ -49,6 +48,8 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
+local StarterGui = game:GetService("StarterGui")
+local playerGui = player:WaitForChild("PlayerGui")
 
 -- Variables initialization
 local selectedPets = {}
@@ -58,6 +59,7 @@ local autoMiddleEnabled = false
 local currentPetsList = {}
 local petDropdown = nil
 local cropDropdown = nil
+local blackScreenGui = nil
 
 -- Sprinkler variables
 local sprinklerTypes = {"Basic Sprinkler", "Advanced Sprinkler", "Master Sprinkler", "Godly Sprinkler", "Honey Sprinkler", "Chocolate Sprinkler"}
@@ -76,7 +78,7 @@ local buyConnection = nil
 -- Create Wind UI Window
 local Window = WindUI:CreateWindow({
     Icon = "rbxassetid://124132063885927",
-    Title = "Genzura Hub (v1.2.3)",
+    Title = "Genzura Hub (v1.2.4)",
     Desc = "Made by Yura",
     SubTitle = "Grow A Garden Script Loader",
     TabWidth = 160,
@@ -99,6 +101,14 @@ local function safeCall(func, funcName, ...)
     end
 
     return result
+end
+
+local function notify(title, content, duration)
+    WindUI:Notify({
+        Title = title,
+        Content = content,
+        Duration = duration or 3
+    })
 end
 
 -- FIXED: Sprinkler helper functions using CoreFunctions
@@ -182,8 +192,8 @@ local MainTab = Window:Tab({
 })
 
 MainTab:Paragraph({
-    Title = "📜Changelogs : (v.1.2.3)",
-    Desc = "Added : New GUI",
+    Title = "📜Changelogs : (v.1.2.4)",
+    Desc = "Added : Added Misc : Blackscreen Toggle",
     color = "#c7c0b7",
 })
 
@@ -609,21 +619,6 @@ Tab:Input({
         local weight = tonumber(value)
         if weight and weight > 0 then
             local success = safeCall(CoreFunctions.setTargetFruitWeight, "setTargetFruitWeight", weight)
-            if success then
-                WindUI:Notify({
-                    Title = "Weight Updated",
-                    Content = string.format("Target weight set to %.1fkg", weight),
-                    Duration = 2,
-                    Icon = "check"
-                })
-            end
-        else
-            WindUI:Notify({
-                Title = "Invalid Weight",
-                Content = "Please enter a valid number above 0",
-                Duration = 3,
-                Icon = "alert-triangle"
-            })
         end
     end
 })
@@ -685,9 +680,6 @@ ShopTab:Dropdown({
         local success, error = pcall(function()
             if AutoBuy and AutoBuy.setSelectedZenItems and type(AutoBuy.setSelectedZenItems) == "function" then
                 local count = AutoBuy.setSelectedZenItems(selectedValues)
-                if count > 0 then
-                    notify("Zen Items", "Selected " .. count .. " zen items for auto buy", 3)
-                end
             end
         end)
         if not success then
@@ -736,9 +728,6 @@ ShopTab:Dropdown({
         local success, error = pcall(function()
             if AutoBuy and AutoBuy.setSelectedMerchantItems and type(AutoBuy.setSelectedMerchantItems) == "function" then
                 local count = AutoBuy.setSelectedMerchantItems(selectedValues)
-                if count > 0 then
-                    notify("Merchant Items", "Selected " .. count .. " merchant items for auto buy", 3)
-                end
             end
         end)
         if not success then
@@ -780,9 +769,6 @@ ShopTab:Dropdown({
         local success, error = pcall(function()
             if AutoBuy and AutoBuy.setSelectedEggs and type(AutoBuy.setSelectedEggs) == "function" then
                 local count = AutoBuy.setSelectedEggs(selectedValues)
-                if count > 0 then
-                    notify("Eggs", "Selected " .. count .. " eggs for auto buy", 3)
-                end
             end
         end)
         if not success then
@@ -824,9 +810,6 @@ ShopTab:Dropdown({
         local success, error = pcall(function()
             if AutoBuy and AutoBuy.setSelectedSeeds and type(AutoBuy.setSelectedSeeds) == "function" then
                 local count = AutoBuy.setSelectedSeeds(selectedValues)
-                if count > 0 then
-                    notify("Seeds", "Selected " .. count .. " seeds for auto buy", 3)
-                end
             end
         end)
         if not success then
@@ -868,9 +851,6 @@ ShopTab:Dropdown({
         local success, error = pcall(function()
             if AutoBuy and AutoBuy.setSelectedGear and type(AutoBuy.setSelectedGear) == "function" then
                 local count = AutoBuy.setSelectedGear(selectedValues)
-                if count > 0 then
-                    notify("Gear", "Selected " .. count .. " gear items for auto buy", 3)
-                end
             end
         end)
         if not success then
@@ -945,6 +925,84 @@ MiscTab:Button({
     Callback = function()
         removeFarms()
         notify("Farms", "Farm removal initiated", 2)
+    end
+})
+
+MiscTab:Toggle({
+    Title = "Black Screen Overlay",
+    Value = false,
+    Icon = "monitor",
+    Callback = function(value)
+        if value then
+            -- TOGGLE ON: Create and show black screen
+            pcall(function()
+                -- Hide Core GUI
+                StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
+                
+                -- Create ScreenGui
+                blackScreenGui = Instance.new("ScreenGui")
+                blackScreenGui.Name = "BlackScreenGui"
+                blackScreenGui.ResetOnSpawn = false
+                blackScreenGui.IgnoreGuiInset = true
+                blackScreenGui.Parent = playerGui
+                
+                -- Black Frame
+                local blackFrame = Instance.new("Frame")
+                blackFrame.Name = "BlackBackground"
+                blackFrame.Size = UDim2.new(1, 0, 1, 0)
+                blackFrame.Position = UDim2.new(0, 0, 0, 0)
+                blackFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+                blackFrame.BackgroundTransparency = 0
+                blackFrame.BorderSizePixel = 0
+                blackFrame.Parent = blackScreenGui
+                
+                -- Logo Image
+                local logoImage = Instance.new("ImageLabel")
+                logoImage.Name = "Logo"
+                logoImage.Size = UDim2.new(0, 200, 0, 200)
+                logoImage.Position = UDim2.new(0.5, -100, 0.5, -100)
+                logoImage.BackgroundTransparency = 1
+                logoImage.ImageTransparency = 0.6
+                logoImage.Image = "rbxassetid://124132063885927"
+                logoImage.ScaleType = Enum.ScaleType.Fit
+                logoImage.Parent = blackFrame
+                
+                -- Add fade in effect
+                blackFrame.BackgroundTransparency = 1
+                logoImage.ImageTransparency = 1
+                
+                local fadeIn = TweenService:Create(
+                    blackFrame, 
+                    TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                    {BackgroundTransparency = 0}
+                )
+                
+                local logoFadeIn = TweenService:Create(
+                    logoImage,
+                    TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                    {ImageTransparency = 0.6}
+                )
+                
+                fadeIn:Play()
+                logoFadeIn:Play()
+                
+                print("Black screen overlay enabled")
+            end)
+        else
+            -- TOGGLE OFF: Remove black screen but keep core hidden
+            pcall(function()
+                -- Keep Core GUI hidden
+                StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
+                
+                -- Destroy the GUI
+                if blackScreenGui then
+                    blackScreenGui:Destroy()
+                    blackScreenGui = nil
+                end
+                
+                print("Black screen overlay disabled - Core GUI remains hidden")
+            end)
+        end
     end
 })
 
