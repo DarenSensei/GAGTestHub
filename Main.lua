@@ -31,7 +31,7 @@ if not WindUI then
 end
 
 -- Load external functions with error handling
-local CoreFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/CoreFunctions.lua", "CoreFunctions")
+local CoreFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/CoreFunctions.lua", "CoreFunctions")
 local PetFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/PetMiddleFunctions.lua", "PetFunctions")
 local AutoBuy = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/AutoBuy.lua", "AutoBuy")
 
