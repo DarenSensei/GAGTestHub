@@ -1,5 +1,5 @@
--- GAGSL Hub Script (Wind UI Version)
-repeat task.wait() until game:IsLoaded()
+-- GAGSL Hub Script (Wind UI Version) - FIXED
+repeat wait() until game:IsLoaded()
 
 -- Safe loading function with error handling
 local function safeLoad(url, name)
@@ -14,12 +14,12 @@ local function safeLoad(url, name)
         end
         return loadedFunction()
     end)
-    
+
     if not success then
         warn("Failed to load " .. name .. ": " .. tostring(result))
         return nil
     end
-    
+
     return result
 end
 
@@ -50,7 +50,7 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
-Variables initialization
+-- Variables initialization
 local selectedPets = {}
 local includedPets = {}
 local allPetsSelected = false
@@ -90,13 +90,13 @@ local function safeCall(func, funcName, ...)
         warn(funcName .. " function not available")
         return nil
     end
-    
+
     local success, result = pcall(func, ...)
     if not success then
         warn("Error calling " .. funcName .. ": " .. tostring(result))
         return nil
     end
-    
+
     return result
 end
 
