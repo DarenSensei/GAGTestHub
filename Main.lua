@@ -75,8 +75,9 @@ local buyConnection = nil
 
 -- Create Wind UI Window
 local Window = WindUI:CreateWindow({
-    Icon = "rbxassetid://76107566118223",
-    Title = "GAGSL Hub (v1.2.3)",
+    Icon = "rbxassetid://124132063885927",
+    Title = "Genzura Hub (v1.2.3)",
+    Desc = "Made by Yura",
     SubTitle = "Grow A Garden Script Loader",
     TabWidth = 160,
     Size = UDim2.fromOffset(470, 350),
@@ -98,15 +99,6 @@ local function safeCall(func, funcName, ...)
     end
 
     return result
-end
-
--- Notification helper
-local function notify(title, content, duration)
-    WindUI:Notify({
-        Title = title,
-        Content = content,
-        Duration = duration or 3
-    })
 end
 
 -- FIXED: Sprinkler helper functions using CoreFunctions
