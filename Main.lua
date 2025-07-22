@@ -50,10 +50,9 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
--- Variables initialization
+Variables initialization
 local selectedPets = {}
-local excludedPets = {}
-local excludedPetESPs = {}
+local includedPets = {}
 local allPetsSelected = false
 local autoMiddleEnabled = false
 local currentPetsList = {}
@@ -147,19 +146,6 @@ end
 
 local function refreshPets()
     return safeCall(PetFunctions.refreshPets, "refreshPets") or {}
-end
-
-local function selectAllPets()
-    safeCall(PetFunctions.selectAllPets, "selectAllPets")
-    allPetsSelected = true
-end
-
-local function createESPMarker(pet)
-    safeCall(PetFunctions.createESPMarker, "createESPMarker", pet)
-end
-
-local function removeESPMarker(petId)
-    safeCall(PetFunctions.removeESPMarker, "removeESPMarker", petId)
 end
 
 local function autoEquipShovel()
@@ -442,9 +428,8 @@ Tab:Paragraph({
     Icon = "info"
 })
 
--- Pet exclusion dropdown
 petDropdown = Tab:Dropdown({
-    Title = "Select Pets to Exclude",
+    Title = "Select Pets to Include in Middle",
     Values = {"None"},
     Value = {},
     Multi = true,
@@ -453,16 +438,13 @@ petDropdown = Tab:Dropdown({
         -- Safely get current data
         local success, error = pcall(function()
             if PetFunctions then
-                excludedPets = safeCall(PetFunctions.getExcludedPets, "getExcludedPets") or {}
+                includedPets = safeCall(PetFunctions.getIncludedPets, "getIncludedPets") or {}
                 currentPetsList = safeCall(PetFunctions.getCurrentPetsList, "getCurrentPetsList") or {}
             end
-            
-            -- Clear existing ESP markers
-            for petId, _ in pairs(excludedPets) do
-                removeESPMarker(petId)
-            end
-            excludedPets = {}
-            
+
+            -- Clear existing included pets
+            includedPets = {}
+
             if selectedValues and #selectedValues > 0 then
                 local hasNone = false
                 for _, value in pairs(selectedValues) do
@@ -471,21 +453,37 @@ petDropdown = Tab:Dropdown({
                         break
                     end
                 end
-                
+
                 if not hasNone then
                     for _, petName in pairs(selectedValues) do
-                        local selectedPet = currentPetsList[petName]
-                        if selectedPet then
-                            excludedPets[selectedPet.id] = true
-                            createESPMarker(selectedPet)
+                        local petGroup = currentPetsList[petName]
+                        if petGroup then
+                            -- If it's a group of pets, include all pets in the group
+                            if type(petGroup) == "table" and #petGroup > 0 then
+                                for _, pet in pairs(petGroup) do
+                                    if pet and pet.id then
+                                        includedPets[pet.id] = true
+                                        -- Also include in PetFunctions
+                                        if PetFunctions and PetFunctions.includePet then
+                                            safeCall(PetFunctions.includePet, "includePet", pet.id)
+                                        end
+                                    end
+                                end
+                            else
+                                -- Single pet
+                                includedPets[petGroup.id] = true
+                                if PetFunctions and PetFunctions.includePet then
+                                    safeCall(PetFunctions.includePet, "includePet", petGroup.id)
+                                end
+                            end
                         end
                     end
                 end
             end
-            
+
             -- Update PetFunctions
-            if PetFunctions and PetFunctions.setExcludedPets then
-                PetFunctions.setExcludedPets(excludedPets)
+            if PetFunctions and PetFunctions.setIncludedPets then
+                PetFunctions.setIncludedPets(includedPets)
             end
         end)
     end
@@ -498,23 +496,31 @@ if PetFunctions and PetFunctions.setPetDropdown then
     end)
 end
 
--- Refresh and select all pets
+-- Refresh pets only
 Tab:Button({
-    Title = "Refresh & Auto Select All Pets",
+    Title = "Refresh Pets",
     Icon = "refresh-cw",
     Callback = function()
         local newPets = refreshPets()
-        selectAllPets()
-        
+
+        -- Clear dropdown selection
         if petDropdown and petDropdown.ClearAll then
             pcall(function()
                 petDropdown:ClearAll()
             end)
         end
-        
+
+        -- Clear included pets
+        includedPets = {}
+        if PetFunctions and PetFunctions.setIncludedPets then
+            pcall(function()
+                PetFunctions.setIncludedPets({})
+            end)
+        end
+
         WindUI:Notify({
-            Title = "Pets Refreshed & Selected",
-            Content = "Found " .. #newPets .. " pets and selected all for auto middle.",
+            Title = "Pets Refreshed",
+            Content = "Found " .. #newPets .. " pets. Please manually select pets to include in middle function.",
             Duration = 3,
             Icon = "check-circle"
         })
@@ -534,14 +540,19 @@ Tab:Toggle({
             end)
         end
         if value then
-            setupZoneAbilityListener()
-            startInitialLoop()
+            if PetFunctions and PetFunctions.setupZoneAbilityListener then
+                safeCall(PetFunctions.setupZoneAbilityListener, "setupZoneAbilityListener")
+            end
+            if PetFunctions and PetFunctions.startInitialLoop then
+                safeCall(PetFunctions.startInitialLoop, "startInitialLoop")
+            end
         else
-            cleanup()
+            if PetFunctions and PetFunctions.cleanup then
+                safeCall(PetFunctions.cleanup, "cleanup")
+            end
         end
     end
 })
-
 Tab:Divider()
 
 Tab:Section({
