@@ -366,16 +366,40 @@ function CoreFunctions.deleteSprinklers(sprinklerArray, OrionLib)
         return
     end
 
+    -- Get the selected farm
+    local GetFarm = game:GetService("ReplicatedStorage").Modules.GetFarm
+    local selectedFarm = nil
+    
+    if GetFarm then
+        local success, farm = pcall(function()
+            return require(GetFarm)()
+        end)
+        if success and farm then
+            selectedFarm = farm
+        end
+    end
+    
+    if not selectedFarm then
+        if OrionLib then
+            OrionLib:MakeNotification({
+                Name = "Error",
+                Content = "No farm selected or could not get farm.",
+                Time = 3
+            })
+        end
+        return
+    end
+
     -- Auto equip shovel first
     CoreFunctions.autoEquipShovel()
     task.wait(0.5)
 
-    -- Check if shovelClient and objectsFolder exist
-    if not shovelClient or not objectsFolder then
+    -- Check if shovelClient exists
+    if not shovelClient then
         if OrionLib then
             OrionLib:MakeNotification({
                 Name = "Error",
-                Content = "Required objects not found.",
+                Content = "Shovel client not found.",
                 Time = 3
             })
         end
@@ -400,36 +424,50 @@ function CoreFunctions.deleteSprinklers(sprinklerArray, OrionLib)
     local deletedCount = 0
     local deletedTypes = {}
 
-    for _, obj in ipairs(objectsFolder:GetChildren()) do
-        for _, typeName in ipairs(targetSprinklers) do
-            if obj.Name == typeName then
-                -- Track which types we actually deleted
-                if not deletedTypes[typeName] then
-                    deletedTypes[typeName] = 0
+    -- Look for sprinklers in the selected farm only
+    if selectedFarm and selectedFarm:FindFirstChild("Objects") then
+        local farmObjects = selectedFarm.Objects
+        
+        for _, obj in ipairs(farmObjects:GetChildren()) do
+            for _, typeName in ipairs(targetSprinklers) do
+                if obj.Name == typeName then
+                    -- Track which types we actually deleted
+                    if not deletedTypes[typeName] then
+                        deletedTypes[typeName] = 0
+                    end
+                    deletedTypes[typeName] = deletedTypes[typeName] + 1
+                    
+                    -- Destroy the object safely
+                    pcall(function()
+                        if destroyEnv and destroyEnv.Destroy and typeof(destroyEnv.Destroy) == "function" then
+                            destroyEnv.Destroy(obj)
+                        end
+                        if DeleteObject then
+                            DeleteObject:FireServer(obj)
+                        end
+                        if RemoveItem then
+                            RemoveItem:FireServer(obj)
+                        end
+                    end)
+                    deletedCount = deletedCount + 1
                 end
-                deletedTypes[typeName] = deletedTypes[typeName] + 1
-                
-                -- Destroy the object safely
-                pcall(function()
-                    if destroyEnv and destroyEnv.Destroy and typeof(destroyEnv.Destroy) == "function" then
-                        destroyEnv.Destroy(obj)
-                    end
-                    if DeleteObject then
-                        DeleteObject:FireServer(obj)
-                    end
-                    if RemoveItem then
-                        RemoveItem:FireServer(obj)
-                    end
-                end)
-                deletedCount = deletedCount + 1
             end
         end
+    else
+        if OrionLib then
+            OrionLib:MakeNotification({
+                Name = "Error",
+                Content = "Selected farm has no Objects folder.",
+                Time = 3
+            })
+        end
+        return
     end
 
     if OrionLib then
         OrionLib:MakeNotification({
             Name = "Sprinklers Deleted",
-            Content = string.format("Deleted %d sprinklers", deletedCount),
+            Content = string.format("Deleted %d sprinklers from selected farm", deletedCount),
             Time = 3
         })
     end
@@ -492,7 +530,6 @@ function CoreFunctions.getSelectedSprinklersString()
     local selectionText = table.concat(selectedSprinklers, ", ")
     return #selectionText > 50 and (selectionText:sub(1, 47) .. "...") or selectionText
 end
-
 -- ==========================================
 -- FARM MANAGEMENT FUNCTIONS
 -- ==========================================
