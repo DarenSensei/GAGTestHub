@@ -457,16 +457,10 @@ function CoreFunctions.deleteSprinklers(sprinklerArray, OrionLib)
                 end
                 deletedTypes[typeName] = deletedTypes[typeName] + 1
                 
-                -- Destroy the object safely
+                -- Use shovel's Remove_Item function
                 pcall(function()
-                    if destroyEnv and destroyEnv.Destroy and typeof(destroyEnv.Destroy) == "function" then
-                        destroyEnv.Destroy(obj)
-                    end
-                    if DeleteObject then
-                        DeleteObject:FireServer(obj)
-                    end
-                    if RemoveItem then
-                        RemoveItem:FireServer(obj)
+                    if destroyEnv and destroyEnv.Remove_Item and typeof(destroyEnv.Remove_Item) == "function" then
+                        destroyEnv.Remove_Item(obj)
                     end
                 end)
                 deletedCount = deletedCount + 1
