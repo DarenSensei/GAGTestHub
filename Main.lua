@@ -30,17 +30,14 @@ if not WindUI then
     error("Failed to load Wind UI - script cannot continue")
 end
 
+
 -- Load external functions with error handling
-local CoreFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/CoreFunctions.lua", "CoreFunctions")
-local PetFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/PetMiddleFunctions.lua", "PetFunctions")
+local CoreFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/CoreFunctions.lua", "CoreFunctions")
 local AutoBuy = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/AutoBuy.lua", "AutoBuy")
--- Check if all dependencies loaded successfully
+local PetFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/PetMiddleFunctions.lua", "PetFunctions")
+local LocalPlayer = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/LocalPlayer.lua", "LocalPlayer")
 if not CoreFunctions then
     error("Failed to load CoreFunctions - script cannot continue")
-end
-
-if not PetFunctions then
-    error("Failed to load PetFunctions - script cannot continue")
 end
 
 -- Services
@@ -50,6 +47,7 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local StarterGui = game:GetService("StarterGui")
 local playerGui = player:WaitForChild("PlayerGui")
+local userInputService = game:GetService("UserInputService")
 
 -- Variables initialization
 local selectedPets = {}
@@ -78,7 +76,7 @@ local buyConnection = nil
 -- Create Wind UI Window
 local Window = WindUI:CreateWindow({
     Icon = "rbxassetid://124132063885927",
-    Title = "Genzura Hub (v1.2.4)",
+    Title = "Genzura Hub",
     Desc = "Made by Yura",
     SubTitle = "Grow A Garden Script Loader",
     TabWidth = 160,
@@ -192,8 +190,8 @@ local MainTab = Window:Tab({
 })
 
 MainTab:Paragraph({
-    Title = "📜Changelogs : (v.1.2.4)",
-    Desc = "Added : Added Misc : Blackscreen Toggle",
+    Title = "📜Changelogs : (v.1.2.5)",
+    Desc = "Added : Added Main : Local Player",
     color = "#c7c0b7",
 })
 
@@ -316,6 +314,45 @@ MainTab:Button({
     end
 })
 
+MainTab:Section({
+    Title = "---- Local Player ----"
+})
+
+MainTab:Toggle({
+    Title = "No-Clip",
+    Value = false,
+    Callback = function(Value)
+        LocalPlayer.setNoClip(Value)
+    end
+})
+
+MainTab:Toggle({
+    Title = "Infinite Jump",
+    Value = false,
+    Callback = function(Value)
+        if Value then
+            local connection
+            connection = userInputService.JumpRequest:Connect(function()
+                if player.Character then
+                    local humanoid = player.Character:FindFirstChildOfClass('Humanoid')
+                    if humanoid then
+                        humanoid:ChangeState("Jumping")
+                    end
+                end
+            end)
+            
+            -- Store connection to disconnect later if needed
+            getgenv().infiniteJumpConnection = connection
+        else
+            -- Disconnect when disabled
+            if getgenv().infiniteJumpConnection then
+                getgenv().infiniteJumpConnection:Disconnect()
+                getgenv().infiniteJumpConnection = nil
+            end
+        end
+    end
+})
+
 -- FARM TAB
 local Tab = Window:Tab({
     Title = "Farm",
@@ -425,8 +462,8 @@ Tab:Section({
 })
 
 Tab:Paragraph({
-    Title = "How to use:",
-    Desc = "Refresh Pets > Choose Exclude Pets, ones has an X Marker in it > Auto Middle Pets",
+    Title = "Pet Exploit:",
+    Desc = "Choose your pet to Stay Middle",
     Icon = "info"
 })
 
@@ -896,24 +933,73 @@ MiscTab:Paragraph({
 })
 
 MiscTab:Button({
-    Title = "Reduce Lag",
-    Desc = "Remove all lag-causing objects from workspace",
+    Title = "Reduce Textures",
+    Desc = "Remove all textures to reduce fps drop",
     Icon = "trash-2",
     Callback = function()
-        local success, error = pcall(function()
-            repeat
-                local lag = game.Workspace:findFirstChild("Lag", true)
-                if (lag ~= nil) then
-                    lag:remove()
+        local ToDisable = {
+            Textures = true,
+            VisualEffects = true,
+            Parts = true,
+            Particles = true,
+            Sky = true
+        }
+        local ToEnable = {
+            FullBright = false
+        }
+        local Stuff = {}
+        for _, v in next, game:GetDescendants() do
+            if ToDisable.Parts then
+                if v:IsA("Part") or v:IsA("Union") or v:IsA("BasePart") then
+                    v.Material = Enum.Material.SmoothPlastic
+                    table.insert(Stuff, 1, v)
                 end
-                wait()
-            until (game.Workspace:findFirstChild("Lag", true) == nil)
-        end)
-        
-        if success then
-            notify("Performance", "All lag objects have been removed", 3)
-        else
-            notify("Error", "Failed to reduce lag: " .. tostring(error), 5)
+            end
+            
+            if ToDisable.Particles then
+                if v:IsA("ParticleEmitter") or v:IsA("Smoke") or v:IsA("Explosion") or v:IsA("Sparkles") or v:IsA("Fire") then
+                    v.Enabled = false
+                    table.insert(Stuff, 1, v)
+                end
+            end
+            
+            if ToDisable.VisualEffects then
+                if v:IsA("BloomEffect") or v:IsA("BlurEffect") or v:IsA("DepthOfFieldEffect") or v:IsA("SunRaysEffect") then
+                    v.Enabled = false
+                    table.insert(Stuff, 1, v)
+                end
+            end
+            
+            if ToDisable.Textures then
+                if v:IsA("Decal") or v:IsA("Texture") then
+                    v.Texture = ""
+                    table.insert(Stuff, 1, v)
+                end
+            end
+            
+            if ToDisable.Sky then
+                if v:IsA("Sky") then
+                    v.Parent = nil
+                    table.insert(Stuff, 1, v)
+                end
+            end
+        end
+        game:GetService("TestService"):Message("Effects Disabler Script : Successfully disabled "..#Stuff.." assets / effects. Settings :")
+        for i, v in next, ToDisable do
+            print(tostring(i)..": "..tostring(v))
+        end
+        if ToEnable.FullBright then
+            local Lighting = game:GetService("Lighting")
+            
+            Lighting.FogColor = Color3.fromRGB(255, 255, 255)
+            Lighting.FogEnd = math.huge
+            Lighting.FogStart = math.huge
+            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+            Lighting.Brightness = 5
+            Lighting.ColorShift_Bottom = Color3.fromRGB(255, 255, 255)
+            Lighting.ColorShift_Top = Color3.fromRGB(255, 255, 255)
+            Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+            Lighting.Outlines = true
         end
     end
 })
@@ -936,41 +1022,50 @@ MiscTab:Toggle({
         if value then
             -- TOGGLE ON: Create and show black screen
             pcall(function()
-                -- Hide Core GUI
-                StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
+                -- Clean up any existing black screen first
+                if blackScreenGui then
+                    blackScreenGui:Destroy()
+                    blackScreenGui = nil
+                end
+                
+                -- Hide specific Core GUI elements (including backpack)
+                StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+                StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+                StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, false)
+                StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.EmotesMenu, false)
                 
                 -- Create ScreenGui
                 blackScreenGui = Instance.new("ScreenGui")
                 blackScreenGui.Name = "BlackScreenGui"
                 blackScreenGui.ResetOnSpawn = false
                 blackScreenGui.IgnoreGuiInset = true
+                blackScreenGui.DisplayOrder = 999999 -- Ensure it's on top
                 blackScreenGui.Parent = playerGui
                 
-                -- Black Frame
+                -- Black Frame (covers everything)
                 local blackFrame = Instance.new("Frame")
                 blackFrame.Name = "BlackBackground"
                 blackFrame.Size = UDim2.new(1, 0, 1, 0)
                 blackFrame.Position = UDim2.new(0, 0, 0, 0)
                 blackFrame.BackgroundColor3 = Color3.new(0, 0, 0)
-                blackFrame.BackgroundTransparency = 0
+                blackFrame.BackgroundTransparency = 1 -- Start transparent for fade
                 blackFrame.BorderSizePixel = 0
+                blackFrame.ZIndex = 1
                 blackFrame.Parent = blackScreenGui
                 
-                -- Logo Image
+                -- Logo Image (keeping the logo as requested)
                 local logoImage = Instance.new("ImageLabel")
                 logoImage.Name = "Logo"
                 logoImage.Size = UDim2.new(0, 200, 0, 200)
                 logoImage.Position = UDim2.new(0.5, -100, 0.5, -100)
                 logoImage.BackgroundTransparency = 1
-                logoImage.ImageTransparency = 0.6
+                logoImage.ImageTransparency = 1 -- Start transparent for fade
                 logoImage.Image = "rbxassetid://124132063885927"
                 logoImage.ScaleType = Enum.ScaleType.Fit
+                logoImage.ZIndex = 2
                 logoImage.Parent = blackFrame
                 
                 -- Add fade in effect
-                blackFrame.BackgroundTransparency = 1
-                logoImage.ImageTransparency = 1
-                
                 local fadeIn = TweenService:Create(
                     blackFrame, 
                     TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
@@ -986,21 +1081,24 @@ MiscTab:Toggle({
                 fadeIn:Play()
                 logoFadeIn:Play()
                 
-                print("Black screen overlay enabled")
+                print("Black screen overlay enabled - Image and backpack hidden")
             end)
         else
-            -- TOGGLE OFF: Remove black screen but keep core hidden
+            -- TOGGLE OFF: Hide black screen and restore all core GUI
             pcall(function()
-                -- Keep Core GUI hidden
-                StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
-                
-                -- Destroy the GUI
-                if blackScreenGui then
+                -- Hide the black screen GUI
+                if blackScreenGui and blackScreenGui.Parent then
                     blackScreenGui:Destroy()
                     blackScreenGui = nil
                 end
                 
-                print("Black screen overlay disabled - Core GUI remains hidden")
+                -- Restore only specific core GUI (NOT backpack)
+                StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, true)
+                StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, true)
+                StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.EmotesMenu, true)
+                -- Backpack stays hidden as requested
+                
+                print("Black screen overlay disabled - Backpack remains hidden")
             end)
         end
     end
@@ -1017,14 +1115,14 @@ local SocialTab = Window:Tab({
 
 SocialTab:Paragraph({
     Title = "TikTok",
-    Desc = "@yurahaxyz | @yurahayz",
+    Desc = "@atutubieee
     Icon = "music",
     Color = "Blue"
 })
 
 SocialTab:Paragraph({
     Title = "YouTube",
-    Desc = "YUraxYZ",
+    Desc = "@YuraScripts",
     Icon = "play",
     Color = "Red"
 })
@@ -1053,4 +1151,4 @@ Players.PlayerRemoving:Connect(function(playerLeaving)
 end)
 
 -- Final notification
-notify("GAGSL Hub", "Wind UI version loaded successfully! +999 Pogi Points!", 4)
+notify("Genzura Hub", "Genzura Hub loaded successfully! +999 Pogi Points! for you!", 4)
