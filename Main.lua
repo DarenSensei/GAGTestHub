@@ -36,6 +36,7 @@ local CoreFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/Gr
 local AutoBuy = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/AutoBuy.lua", "AutoBuy")
 local PetFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/PetMiddleFunctions.lua", "PetFunctions")
 local LocalPlayer = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/LocalPlayer.lua", "LocalPlayer")
+local Vuln = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/Vuln.lua", "Vuln")
 if not CoreFunctions then
     error("Failed to load CoreFunctions - script cannot continue")
 end
@@ -1115,7 +1116,7 @@ local SocialTab = Window:Tab({
 
 SocialTab:Paragraph({
     Title = "TikTok",
-    Desc = "@atutubieee
+    Desc = "@atutubieee",
     Icon = "music",
     Color = "Blue"
 })
