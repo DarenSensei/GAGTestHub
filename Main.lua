@@ -1239,6 +1239,51 @@ MiscTab:Toggle({
     end
 })
 
+MiscTab:Section({
+    Title = "--ESP--"
+})
+
+
+MiscTab:Divider()
+
+MiscTab:Dropdown({
+    Title = "Select Crops to Monitor",
+    Values = safeCall(esp.getCropTypes, "getCropTypes") or {"All Plants"},
+    Value = {""},
+    Multi = true,
+    AllowNone = true,
+    Callback = function(selectedValues)
+        local selectedCrops = {}
+        
+        if selectedValues and #selectedValues > 0 then
+            local hasAllPlants = false
+            for _, value in pairs(selectedValues) do
+                if value == "All Plants" then
+                    hasAllPlants = true
+                    break
+                end
+            end
+            
+            if not hasAllPlants then
+                for _, cropName in pairs(selectedValues) do
+                    selectedCrops[cropName] = true
+                end
+            end
+        end
+        
+        safeCall(esp.setSelectedCrops, "setSelectedCrops", selectedCrops)
+    end
+})
+
+
+MiscTab:Toggle({
+    Title = "Fruit ESP",
+    Value = false,
+    Callback = function(Value)
+        esp.toggle(Value)
+    end
+})
+
 -- ===========================================
 -- SOCIAL TAB (Updated for WindUI)
 -- ===========================================
