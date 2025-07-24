@@ -916,6 +916,139 @@ ShopTab:Toggle({
 if AutoBuy and AutoBuy.init and type(AutoBuy.init) == "function" then
     AutoBuy.init()
 end
+
+-- =========================
+-- Vuln Tab
+-- =========================
+
+local VulnTab = Window:Tab({
+    Title = "Vuln",
+    Icon = "syringe",
+    Desc = "Performance optimization and miscellaneous features"
+})
+
+VulnTab:Paragraph({
+    Title = "Vuln",
+    Desc = "Exploit of the week",
+    Icon = "zap"
+})
+
+-- Dropdown for selecting craft items
+VulnTab:Dropdown({
+    Title = "Select Items to Craft",
+    Values = {"Dino Egg", "Ancient Seed Pack", "Primal Egg"},
+    Value = {},
+    Multi = true,
+    AllowNone = true,
+    Callback = function(selectedValues)
+        local success, error = pcall(function()
+            -- Clear existing selected items
+            selectedCraftItems = {}
+            
+            if selectedValues and #selectedValues > 0 then
+                local hasNone = false
+                for _, value in pairs(selectedValues) do
+                    if value == "None" then
+                        hasNone = true
+                        break
+                    end
+                end
+                
+                if not hasNone then
+                    for _, itemName in pairs(selectedValues) do
+                        selectedCraftItems[itemName] = true
+                    end
+                end
+            end
+            
+            -- Update Vuln functions if available
+            if Vuln and Vuln.setSelectedCraftItems then
+                pcall(function()
+                    Vuln.setSelectedCraftItems(selectedCraftItems)
+                end)
+            end
+        end)
+        
+        if not success then
+            print("Error in craft dropdown callback:", error)
+        end
+    end
+})
+
+-- Toggle for auto rejoin (only sets the preference, doesn't start rejoin)
+VulnTab:Toggle({
+    Title = "Auto Rejoin",
+    Value = false,
+    Icon = "refresh-ccw",
+    Callback = function(value)
+        teleportEnabled = value
+        
+        if Vuln and Vuln.setTeleportEnabled then
+            pcall(function()
+                Vuln.setTeleportEnabled(value)
+            end)
+        end
+        
+        -- Update saved state
+        if updateSavedState then
+            pcall(function()
+                updateSavedState()
+            end)
+        end
+        
+        WindUI:Notify({
+            Title = "Auto Rejoin " .. (value and "Enabled" or "Disabled"),
+            Content = value and "Will rejoin after crafting when Auto Craft is started" or "Auto rejoin disabled",
+            Duration = 2,
+            Icon = value and "settings" or "settings"
+        })
+    end
+})
+
+-- Button for Auto Craft
+VulnTab:Button({
+    Title = "Start Auto Craft",
+    Icon = "play",
+    Callback = function()
+        local success, error = pcall(function()
+            if not selectedCraftItems or next(selectedCraftItems) == nil then
+                WindUI:Notify({
+                    Title = "No Items Selected",
+                    Content = "Please select items to craft from the dropdown above.",
+                    Duration = 3,
+                    Icon = "alert-triangle"
+                })
+                return
+            end
+            
+            -- Start crafting process with current rejoin setting
+            if Vuln and Vuln.startAutoCraft then
+                Vuln.startAutoCraft(selectedCraftItems, teleportEnabled)
+            else
+                -- Fallback to local crafting functions
+                startLocalAutoCraft(teleportEnabled)
+            end
+            
+            local rejoinStatus = teleportEnabled and " (Auto Rejoin: ON)" or " (Auto Rejoin: OFF)"
+            WindUI:Notify({
+                Title = "Auto Craft Started",
+                Content = "Crafting selected items..." .. rejoinStatus,
+                Duration = 3,
+                Icon = "check-circle"
+            })
+        end)
+        
+        if not success then
+            WindUI:Notify({
+                Title = "Error",
+                Content = "Failed to start auto craft: " .. tostring(error),
+                Duration = 5,
+                Icon = "x-circle"
+            })
+        end
+    end
+})
+
 -- ===========================================
 -- MISC TAB (Updated for WindUI)
 -- ===========================================
