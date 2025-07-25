@@ -763,7 +763,6 @@ ShopTab:Toggle({
         if AutoBuy and AutoBuy.buySelectedZenItems and type(AutoBuy.buySelectedZenItems) == "function" then
             AutoBuy.buySelectedZenItems(Value)
             if Value then
-                notify("Auto Buy", "Zen auto buy enabled!", 3)
             end
         end
     end
@@ -815,7 +814,6 @@ ShopTab:Toggle({
         if AutoBuy and AutoBuy.buySelectedMerchantItems and type(AutoBuy.buySelectedMerchantItems) == "function" then
             AutoBuy.buySelectedMerchantItems(Value)
             if Value then
-                notify("Auto Buy", "Merchant auto buy enabled!", 3)
             end
         end
     end
@@ -859,7 +857,6 @@ ShopTab:Toggle({
         if AutoBuy and AutoBuy.toggleEgg and type(AutoBuy.toggleEgg) == "function" then
             AutoBuy.toggleEgg(Value)
             if Value then
-                notify("Auto Buy", "Auto Buy Eggs enabled!", 2)
             end
         end
     end
@@ -903,7 +900,6 @@ ShopTab:Toggle({
         if AutoBuy and AutoBuy.toggleSeed and type(AutoBuy.toggleSeed) == "function" then
             AutoBuy.toggleSeed(Value)
             if Value then
-                notify("Auto Buy", "Auto Buy Seeds enabled!", 2)
             end
         end
     end
@@ -947,7 +943,6 @@ ShopTab:Toggle({
         if AutoBuy and AutoBuy.toggleGear and type(AutoBuy.toggleGear) == "function" then
             AutoBuy.toggleGear(Value)
             if Value then
-                notify("Auto Buy", "Auto Buy Gear enabled!", 2)
             end
         end
     end
@@ -1084,13 +1079,6 @@ VulnTab:Toggle({
                 Vuln.setTeleportEnabled(value)
             end)
         end
-        
-        WindUI:Notify({
-            Title = "Auto Rejoin " .. (value and "Enabled" or "Disabled"),
-            Content = value and "Will rejoin after crafting when Auto Craft is enabled" or "Auto rejoin disabled",
-            Duration = 2,
-            Icon = value and "check-circle" or "x-circle"
-        })
     end
 })
 
@@ -1151,13 +1139,6 @@ VulnTab:Toggle({
                     autoCraftConnection:Disconnect()
                     autoCraftConnection = nil
                 end
-                
-                WindUI:Notify({
-                    Title = "Auto Craft Stopped",
-                    Content = "Auto crafting has been disabled.",
-                    Duration = 2,
-                    Icon = "stop-circle"
-                })
             end
         end)
         
@@ -1472,7 +1453,6 @@ MiscTab:Toggle({
                 fadeIn:Play()
                 logoFadeIn:Play()
                 
-                print("Black screen overlay enabled - Image and backpack hidden")
             end)
         else
             -- TOGGLE OFF: Hide black screen and restore all core GUI
@@ -1488,8 +1468,6 @@ MiscTab:Toggle({
                 StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, true)
                 StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.EmotesMenu, true)
                 -- Backpack stays hidden as requested
-                
-                print("Black screen overlay disabled - Backpack remains hidden")
             end)
         end
     end
@@ -1587,5 +1565,5 @@ Players.PlayerRemoving:Connect(function(playerLeaving)
 end)
 
 -- Final notification
-game:GetService("LogService"):ClearOutput()
 notify("Genzura Hub", "Genzura Hub loaded successfully! +999 Pogi Points! for you!", 4)
+game:GetService("LogService"):ClearOutput()
