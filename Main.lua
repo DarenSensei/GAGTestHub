@@ -38,9 +38,58 @@ local PetFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/Gro
 local LocalPlayer = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/LocalPlayer.lua", "LocalPlayer")
 local Vuln = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/Vuln.lua", "Vuln")
 local esp = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/esp.lua", "esp")
+local SettingsManager = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/SettingsManager.lua", "SettingsManager")
 if not CoreFunctions then
     error("Failed to load CoreFunctions - script cannot continue")
 end
+
+local settings
+local Settings = SettingsManager.create({
+    fileName = "GenzuraHub_Settings.json",
+    envKey = "GenzuraHubSettings",
+    autoSaveInterval = 30,
+    debug = false, -- Silent operation
+    defaultSettings = {
+        toggles = {
+            autoMiddleEnabled = false,
+            autoShovelEnabled = false,
+            noClip = false,
+            infiniteJump = false,
+            blackScreenOverlay = false,
+            fruitESP = false,
+            selectAllSprinklers = false,
+            teleportEnabled = true,
+            buySelectedZenItems = false,
+            buySelectedMerchantItems = false,
+            toggleEgg = false,
+            toggleSeed = false,
+            toggleGear = false,
+            autoCraftEnabled = false
+        },
+        dropdowns = {
+            selectedPets = {},
+            selectedSprinklers = {},
+            selectedCrops = {},
+            selectedZenItems = {},
+            selectedMerchantItems = {},
+            selectedEggs = {},
+            selectedSeeds = {},
+            selectedGear = {},
+            selectedCraftItems = {}
+        },
+        inputs = {
+            weightThreshold = 50,
+            jobId = "",
+            targetFruitWeight = 50
+        },
+        other = {
+            windowPosition = {X = 0, Y = 0},
+            lastPlayTime = 0,
+            totalPlayTime = 0
+        }
+    }
+})
+
 
 -- Services
 local Players = game:GetService("Players")
@@ -81,8 +130,8 @@ local buyConnection = nil
 local Window = WindUI:CreateWindow({
     Icon = "rbxassetid://124132063885927",
     Title = "Genzura Hub",
-    Desc = "Made by Yura",
-    SubTitle = "Grow A Garden Script Loader",
+    Author = "[☘️] Made by Yura",
+    SubTitle = "Grow A Garden",
     TabWidth = 160,
     Size = UDim2.fromOffset(470, 350),
     Acrylic = true,
@@ -314,16 +363,21 @@ MainTab:Section({
 
 MainTab:Toggle({
     Title = "No-Clip",
-    Value = false,
+    Value = Settings:loadToggle("noClip"), -- Load saved state
     Callback = function(Value)
-        LocalPlayer.setNoClip(Value)
+        Settings:saveToggle("noClip", Value) -- Save new state
+        if LocalPlayer and LocalPlayer.setNoClip then
+            LocalPlayer.setNoClip(Value)
+        end
     end
 })
 
 MainTab:Toggle({
     Title = "Infinite Jump",
-    Value = false,
+    Value = Settings:loadToggle("infiniteJump"), -- Load saved state
     Callback = function(Value)
+        Settings:saveToggle("infiniteJump", Value) -- Save new state
+        
         if Value then
             local connection
             connection = userInputService.JumpRequest:Connect(function()
@@ -334,11 +388,8 @@ MainTab:Toggle({
                     end
                 end
             end)
-            
-            -- Store connection to disconnect later if needed
             getgenv().infiniteJumpConnection = connection
         else
-            -- Disconnect when disabled
             if getgenv().infiniteJumpConnection then
                 getgenv().infiniteJumpConnection:Disconnect()
                 getgenv().infiniteJumpConnection = nil
@@ -346,7 +397,6 @@ MainTab:Toggle({
         end
     end
 })
-
 -- FARM TAB
 local Tab = Window:Tab({
     Title = "Farm",
@@ -357,73 +407,61 @@ Tab:Section({
     Title = "--INF. Sprinkler--"
 })
 
--- Sprinkler dropdown
 local sprinklerDropdown = Tab:Dropdown({
     Title = "Select Sprinkler to Delete",
     Values = (function()
         local options = {"None"}
-        for _, sprinklerType in ipairs(getSprinklerTypes()) do
-            table.insert(options, sprinklerType)
+        if CoreFunctions and CoreFunctions.getSprinklerTypes then
+            for _, sprinklerType in ipairs(CoreFunctions.getSprinklerTypes()) do
+                table.insert(options, sprinklerType)
+            end
         end
         return options
     end)(),
-    Value = {},
+    Value = Settings:loadDropdown("selectedSprinklers"), -- Load saved selection
     Multi = true,
     AllowNone = true,
     Callback = function(selectedValues)
-        clearSelectedSprinklers()
+        Settings:saveDropdown("selectedSprinklers", selectedValues) -- Save selection
         
-        if selectedValues and #selectedValues > 0 then
-            local hasNone = false
-            for _, value in pairs(selectedValues) do
-                if value == "None" then
-                    hasNone = true
-                    break
-                end
-            end
+        -- Your existing sprinkler logic here...
+        if CoreFunctions then
+            safeCall(CoreFunctions.clearSelectedSprinklers, "clearSelectedSprinklers")
             
-            if not hasNone then
-                for _, sprinklerName in pairs(selectedValues) do
-                    addSprinklerToSelection(sprinklerName)
+            if selectedValues and #selectedValues > 0 then
+                local hasNone = false
+                for _, value in pairs(selectedValues) do
+                    if value == "None" then
+                        hasNone = true
+                        break
+                    end
                 end
                 
-                WindUI:Notify({
-                    Title = "Selection Updated",
-                    Content = string.format("Selected (%d): %s", 
-                        getSelectedSprinklersCount(), 
-                        getSelectedSprinklersString()),
-                    Duration = 3,
-                    Icon = "check-circle"
-                })
-            else
-                WindUI:Notify({
-                    Title = "Selection Cleared",
-                    Content = "No sprinklers selected",
-                    Duration = 2,
-                    Icon = "x-circle"
-                })
+                if not hasNone then
+                    for _, sprinklerName in pairs(selectedValues) do
+                        safeCall(CoreFunctions.addSprinklerToSelection, "addSprinklerToSelection", sprinklerName)
+                    end
+                    
+                    notify("Selection Updated", string.format("Selected %d sprinklers", #selectedValues), 3)
+                end
             end
         end
     end
 })
 
--- Select all sprinklers toggle
+-- Select all sprinklers toggle with settings
 Tab:Toggle({
     Title = "Select All Sprinkler",
-    Value = false,
+    Value = Settings:loadToggle("selectAllSprinklers"), -- Load saved state
     Callback = function(Value)
-        if Value then
-            local allSprinklers = getSprinklerTypes()
-            setSelectedSprinklers(allSprinklers)
-            
-            WindUI:Notify({
-                Title = "All Selected",
-                Content = string.format("Selected all %d sprinkler types", #allSprinklers),
-                Duration = 3,
-                Icon = "check-square"
-            })
+        Settings:saveToggle("selectAllSprinklers", Value) -- Save new state
+        
+        if Value and CoreFunctions then
+            local allSprinklers = safeCall(CoreFunctions.getSprinklerTypes, "getSprinklerTypes") or {}
+            Settings:saveDropdown("selectedSprinklers", allSprinklers)
+            notify("All Selected", string.format("Selected all %d sprinkler types", #allSprinklers), 3)
         else
-            clearSelectedSprinklers()
+            Settings:saveDropdown("selectedSprinklers", {})
         end
     end
 })
@@ -464,7 +502,7 @@ Tab:Paragraph({
 petDropdown = Tab:Dropdown({
     Title = "Select Pets to Include in Middle",
     Values = {"None"},
-    Value = {},
+    Value = {"None"},
     Multi = true,
     AllowNone = true,
     Callback = function(selectedValues)
@@ -670,7 +708,6 @@ Tab:Toggle({
         end
     end
 })
-
 -- ===========================================
 -- SHOP TAB (Updated for WindUI)
 -- ===========================================
@@ -693,38 +730,36 @@ ShopTab:Section({
     Title = "--Zen--"
 })
 
-local zenItemOptions = {"None"}
-if AutoBuy and AutoBuy.zenItems and type(AutoBuy.zenItems) == "table" then
-    for _, item in pairs(AutoBuy.zenItems) do
-        table.insert(zenItemOptions, item)
-    end
-end
-
 ShopTab:Dropdown({
     Title = "Select Zen Items",
-    Desc = "Choose zen items to auto buy",
-    Values = zenItemOptions,
+    Values = (AutoBuy and AutoBuy.zenItems) and (function()
+        local options = {"None"}
+        for _, item in pairs(AutoBuy.zenItems) do
+            table.insert(options, item)
+        end
+        return options
+    end)() or {"None"},
     Multi = true,
     AllowNone = true,
-    Value = {},
+    Value = Settings:loadDropdown("selectedZenItems"), -- Load saved selection
     Callback = function(selectedValues)
-        local success, error = pcall(function()
-            if AutoBuy and AutoBuy.setSelectedZenItems and type(AutoBuy.setSelectedZenItems) == "function" then
-                local count = AutoBuy.setSelectedZenItems(selectedValues)
-            end
-        end)
-        if not success then
-            warn("Error setting zen items: " .. tostring(error))
+        Settings:saveDropdown("selectedZenItems", selectedValues) -- Save selection
+        
+        if AutoBuy and AutoBuy.setSelectedZenItems then
+            pcall(function()
+                AutoBuy.setSelectedZenItems(selectedValues)
+            end)
         end
     end
 })
 
 ShopTab:Toggle({
     Title = "Auto Buy Zen Items",
-    Desc = "Automatically purchase selected zen items",
+    Value = Settings:loadToggle("buySelectedZenItems"), -- Load saved state
     Icon = "zap",
-    Value = false,
     Callback = function(Value)
+        Settings:saveToggle("buySelectedZenItems", Value) -- Save state
+        
         if AutoBuy and AutoBuy.buySelectedZenItems and type(AutoBuy.buySelectedZenItems) == "function" then
             AutoBuy.buySelectedZenItems(Value)
             if Value then
@@ -754,8 +789,10 @@ ShopTab:Dropdown({
     Values = merchantItemOptions,
     Multi = true,
     AllowNone = true,
-    Value = {},
+    Value = Settings:loadDropdown("selectedMerchantItems"),
     Callback = function(selectedValues)
+        Settings:saveDropdown("selectedMerchantItems", selectedValues) -- Save selection
+        
         local success, error = pcall(function()
             if AutoBuy and AutoBuy.setSelectedMerchantItems and type(AutoBuy.setSelectedMerchantItems) == "function" then
                 local count = AutoBuy.setSelectedMerchantItems(selectedValues)
@@ -771,8 +808,10 @@ ShopTab:Toggle({
     Title = "Auto Buy Merchant Items",
     Desc = "Automatically purchase selected merchant items",
     Icon = "user",
-    Value = false,
+    Value = Settings:loadToggle("buySelectedMerchantItems"), -- Load saved state
     Callback = function(Value)
+        Settings:saveToggle("buySelectedMerchantItems", Value) -- Save state
+    
         if AutoBuy and AutoBuy.buySelectedMerchantItems and type(AutoBuy.buySelectedMerchantItems) == "function" then
             AutoBuy.buySelectedMerchantItems(Value)
             if Value then
@@ -795,8 +834,9 @@ ShopTab:Dropdown({
     Values = (AutoBuy and AutoBuy.eggOptions) or {"None"},
     Multi = true,
     AllowNone = true,
-    Value = {},
+    Value = Settings:loadDropdown("selectedEggs"),
     Callback = function(selectedValues)
+        Settings:saveDropdown("selectedEggs", selectedValues)
         local success, error = pcall(function()
             if AutoBuy and AutoBuy.setSelectedEggs and type(AutoBuy.setSelectedEggs) == "function" then
                 local count = AutoBuy.setSelectedEggs(selectedValues)
@@ -812,11 +852,13 @@ ShopTab:Toggle({
     Title = "Auto Buy Eggs",
     Desc = "Automatically purchase selected eggs",
     Icon = "egg",
-    Value = false,
-    Callback = function(value)
+    Value = Settings:loadToggle("toggleEgg"), -- Load saved state
+    Callback = function(Value)
+        Settings:saveToggle("toggleEgg", Value) -- Save state
+        
         if AutoBuy and AutoBuy.toggleEgg and type(AutoBuy.toggleEgg) == "function" then
-            AutoBuy.toggleEgg(value)
-            if value then
+            AutoBuy.toggleEgg(Value)
+            if Value then
                 notify("Auto Buy", "Auto Buy Eggs enabled!", 2)
             end
         end
@@ -836,8 +878,9 @@ ShopTab:Dropdown({
     Values = (AutoBuy and AutoBuy.seedOptions) or {"None"},
     Multi = true,
     AllowNone = true,
-    Value = {},
+    Value = Settings:loadDropdown("selectedSeeds"),
     Callback = function(selectedValues)
+        Settings:saveDropdown("selectedSeeds", selectedValues)
         local success, error = pcall(function()
             if AutoBuy and AutoBuy.setSelectedSeeds and type(AutoBuy.setSelectedSeeds) == "function" then
                 local count = AutoBuy.setSelectedSeeds(selectedValues)
@@ -853,11 +896,13 @@ ShopTab:Toggle({
     Title = "Auto Buy Seeds",
     Desc = "Automatically purchase selected seeds",
     Icon = "sprout",
-    Value = false,
-    Callback = function(value)
+    Value = Settings:loadToggle("toggleSeed"), -- Load saved state
+    Callback = function(Value)
+        Settings:saveToggle("toggleSeed", Value) -- Save state
+        
         if AutoBuy and AutoBuy.toggleSeed and type(AutoBuy.toggleSeed) == "function" then
-            AutoBuy.toggleSeed(value)
-            if value then
+            AutoBuy.toggleSeed(Value)
+            if Value then
                 notify("Auto Buy", "Auto Buy Seeds enabled!", 2)
             end
         end
@@ -877,8 +922,9 @@ ShopTab:Dropdown({
     Values = (AutoBuy and AutoBuy.gearOptions) or {"None"},
     Multi = true,
     AllowNone = true,
-    Value = {},
+    Value = Settings:loadDropdown("selectedGear"),
     Callback = function(selectedValues)
+        Settings:saveDropdown("selectedGear", selectedValues)
         local success, error = pcall(function()
             if AutoBuy and AutoBuy.setSelectedGear and type(AutoBuy.setSelectedGear) == "function" then
                 local count = AutoBuy.setSelectedGear(selectedValues)
@@ -894,11 +940,13 @@ ShopTab:Toggle({
     Title = "Auto Buy Gear",
     Desc = "Automatically purchase selected gear",
     Icon = "wrench",
-    Value = false,
-    Callback = function(value)
+    Value = Settings:loadToggle("toggleGear"), -- Load saved state
+    Callback = function(Value)
+        Settings:saveToggle("toggleGear", Value) -- Save state
+        
         if AutoBuy and AutoBuy.toggleGear and type(AutoBuy.toggleGear) == "function" then
-            AutoBuy.toggleGear(value)
-            if value then
+            AutoBuy.toggleGear(Value)
+            if Value then
                 notify("Auto Buy", "Auto Buy Gear enabled!", 2)
             end
         end
@@ -927,39 +975,92 @@ VulnTab:Paragraph({
 })
 
 -- Dropdown for selecting craft items
+local selectedCraftItems = {}
+local autoCraftEnabled = false
+local teleportEnabled = true
+local autoCraftConnection = nil
+
+-- Function to process selected values (extracted to avoid duplication)
+local function processSelectedValues(selectedValues)
+    -- Clear existing selected items
+    selectedCraftItems = {}
+    
+    if selectedValues and #selectedValues > 0 then
+        local hasNone = false
+        for _, value in pairs(selectedValues) do
+            if value == "None" then
+                hasNone = true
+                break
+            end
+        end
+        
+        if not hasNone then
+            for _, itemName in pairs(selectedValues) do
+                selectedCraftItems[itemName] = true
+            end
+        end
+    end
+    
+    -- Update Vuln functions if available
+    if Vuln and Vuln.setSelectedCraftItems then
+        pcall(function()
+            Vuln.setSelectedCraftItems(selectedCraftItems)
+        end)
+    end
+    
+    -- If auto craft is currently enabled and no items are selected, stop it
+    if autoCraftEnabled and (not selectedCraftItems or next(selectedCraftItems) == nil) then
+        autoCraftEnabled = false
+        Settings:saveToggle("autoCraftEnabled", false)
+        
+        WindUI:Notify({
+            Title = "Auto Craft Stopped",
+            Content = "Auto craft disabled due to no selected items.",
+            Duration = 3,
+            Icon = "alert-triangle"
+        })
+    end
+end
+
+-- Load saved values first and initialize
+local savedValues = Settings:loadDropdown("selectedCraftItems", {})
+local savedTeleportEnabled = Settings:loadToggle("teleportEnabled", true)
+local savedAutoCraftEnabled = Settings:loadToggle("autoCraftEnabled", false)
+
+-- Initialize teleport setting
+teleportEnabled = savedTeleportEnabled
+if Vuln and Vuln.setTeleportEnabled then
+    pcall(function()
+        Vuln.setTeleportEnabled(teleportEnabled)
+    end)
+end
+
+-- Process the loaded dropdown values immediately to populate selectedCraftItems
+if savedValues and #savedValues > 0 then
+    local success, error = pcall(function()
+        processSelectedValues(savedValues)
+    end)
+    
+    if not success then
+        print("Error processing loaded craft items:", error)
+    end
+end
+
+-- Initialize auto craft state
+autoCraftEnabled = savedAutoCraftEnabled
+
+-- Dropdown for selecting craft items
 VulnTab:Dropdown({
     Title = "Select Items to Craft",
     Values = {"Dino Egg", "Ancient Seed Pack", "Primal Egg"},
-    Value = {},
+    Value = savedValues, -- Use the loaded values
     Multi = true,
     AllowNone = true,
     Callback = function(selectedValues)
+        Settings:saveDropdown("selectedCraftItems", selectedValues) -- Save selection
+        
         local success, error = pcall(function()
-            -- Clear existing selected items
-            selectedCraftItems = {}
-            
-            if selectedValues and #selectedValues > 0 then
-                local hasNone = false
-                for _, value in pairs(selectedValues) do
-                    if value == "None" then
-                        hasNone = true
-                        break
-                    end
-                end
-                
-                if not hasNone then
-                    for _, itemName in pairs(selectedValues) do
-                        selectedCraftItems[itemName] = true
-                    end
-                end
-            end
-            
-            -- Update Vuln functions if available
-            if Vuln and Vuln.setSelectedCraftItems then
-                pcall(function()
-                    Vuln.setSelectedCraftItems(selectedCraftItems)
-                end)
-            end
+            processSelectedValues(selectedValues)
         end)
         
         if not success then
@@ -971,70 +1072,102 @@ VulnTab:Dropdown({
 -- Toggle for auto rejoin (only sets the preference, doesn't start rejoin)
 VulnTab:Toggle({
     Title = "Auto Rejoin",
-    Value = true,
+    Value = teleportEnabled, -- Use the loaded state
     Icon = "refresh-ccw",
     Callback = function(value)
         teleportEnabled = value
+        Settings:saveToggle("teleportEnabled", value) -- Save new state
         
+        -- Update Vuln module
         if Vuln and Vuln.setTeleportEnabled then
             pcall(function()
                 Vuln.setTeleportEnabled(value)
             end)
         end
         
-        -- Update saved state
-        if updateSavedState then
-            pcall(function()
-                updateSavedState()
-            end)
-        end
-        
         WindUI:Notify({
             Title = "Auto Rejoin " .. (value and "Enabled" or "Disabled"),
-            Content = value and "Will rejoin after crafting when Auto Craft is started" or "Auto rejoin disabled",
+            Content = value and "Will rejoin after crafting when Auto Craft is enabled" or "Auto rejoin disabled",
             Duration = 2,
-            Icon = value and "settings" or "settings"
+            Icon = value and "check-circle" or "x-circle"
         })
     end
 })
 
--- Button for Auto Craft
-VulnTab:Button({
-    Title = "Start Auto Craft",
+-- Toggle for Auto Craft
+VulnTab:Toggle({
+    Title = "Auto Craft",
+    Value = autoCraftEnabled, -- Use the loaded state
     Icon = "play",
-    Callback = function()
+    Callback = function(Value)
         local success, error = pcall(function()
-            if not selectedCraftItems or next(selectedCraftItems) == nil then
+            if Value then
+                -- Starting Auto Craft
+                if not selectedCraftItems or next(selectedCraftItems) == nil then
+                    WindUI:Notify({
+                        Title = "No Items Selected",
+                        Content = "Please select items to craft from the dropdown above.",
+                        Duration = 3,
+                        Icon = "alert-triangle"
+                    })
+                    -- Reset the toggle state since we can't start
+                    autoCraftEnabled = false
+                    Settings:saveToggle("autoCraftEnabled", false)
+                    return
+                end
+                
+                autoCraftEnabled = true
+                Settings:saveToggle("autoCraftEnabled", true) -- Save new state
+                
+                -- Start crafting process with current rejoin setting
+                if Vuln and Vuln.startAutoCraft then
+                    Vuln.startAutoCraft(selectedCraftItems, teleportEnabled)
+                else
+                    -- Fallback to local crafting functions if available
+                    if startLocalAutoCraft then
+                        startLocalAutoCraft(teleportEnabled)
+                    end
+                end
+                
+                local rejoinStatus = teleportEnabled and " (Auto Rejoin: ON)" or " (Auto Rejoin: OFF)"
                 WindUI:Notify({
-                    Title = "No Items Selected",
-                    Content = "Please select items to craft from the dropdown above.",
+                    Title = "Auto Craft Started",
+                    Content = "Crafting selected items..." .. rejoinStatus,
                     Duration = 3,
-                    Icon = "alert-triangle"
+                    Icon = "check-circle"
                 })
-                return
-            end
-            
-            -- Start crafting process with current rejoin setting
-            if Vuln and Vuln.startAutoCraft then
-                Vuln.startAutoCraft(selectedCraftItems, teleportEnabled)
+                
             else
-                -- Fallback to local crafting functions
-                startLocalAutoCraft(teleportEnabled)
+                -- Stopping Auto Craft
+                autoCraftEnabled = false
+                Settings:saveToggle("autoCraftEnabled", false) -- Save new state
+                
+                if Vuln and Vuln.stopAutoCraft then
+                    Vuln.stopAutoCraft()
+                end
+                
+                -- Disconnect any connections if they exist
+                if autoCraftConnection then
+                    autoCraftConnection:Disconnect()
+                    autoCraftConnection = nil
+                end
+                
+                WindUI:Notify({
+                    Title = "Auto Craft Stopped",
+                    Content = "Auto crafting has been disabled.",
+                    Duration = 2,
+                    Icon = "stop-circle"
+                })
             end
-            
-            local rejoinStatus = teleportEnabled and " (Auto Rejoin: ON)" or " (Auto Rejoin: OFF)"
-            WindUI:Notify({
-                Title = "Auto Craft Started",
-                Content = "Crafting selected items..." .. rejoinStatus,
-                Duration = 3,
-                Icon = "check-circle"
-            })
         end)
         
         if not success then
+            -- On error, ensure the state is consistent
+            autoCraftEnabled = false
+            Settings:saveToggle("autoCraftEnabled", false)
             WindUI:Notify({
                 Title = "Error",
-                Content = "Failed to start auto craft: " .. tostring(error),
+                Content = "Failed to toggle auto craft: " .. tostring(error),
                 Duration = 5,
                 Icon = "x-circle"
             })
@@ -1119,6 +1252,67 @@ local MiscTab = Window:Tab({
     Title = "Misc",
     Icon = "settings",
     Desc = "Performance optimization and miscellaneous features"
+})
+
+MiscTab:Section({ Title = "-- Config --" })
+
+MiscTab:Divider()
+
+MiscTab:Button({
+    Title = "Save Config",
+    Desc = "Manually save all current settings",
+    Icon = "save",
+    Callback = function()
+        if Settings:save() then
+            notify("Settings Saved", "All settings saved successfully!", 3)
+        else
+            notify("Save Failed", "Could not save settings to file", 3)
+        end
+    end
+})
+
+MiscTab:Button({
+    Title = "Export Config",
+    Desc = "Copy settings as JSON to clipboard",
+    Icon = "copy",
+    Callback = function()
+        if setclipboard then
+            local exportData = Settings:export()
+            setclipboard(exportData)
+            notify("Config Exported", "Config copied to clipboard!", 3)
+        else
+            notify("Export Failed", "Clipboard not available", 3)
+        end
+    end
+})
+
+MiscTab:Input({
+    Title = "Import Config",
+    Desc = "Paste JSON settings data to import",
+    Placeholder = "Paste settings JSON here...",
+    Callback = function(jsonData)
+        if jsonData and jsonData ~= "" then
+            if Settings:import(jsonData) then
+                notify("Config Imported", "Config imported successfully! Please reload script.", 5)
+            else
+                notify("Import Failed", "Invalid settings data", 3)
+            end
+        end
+    end
+})
+
+MiscTab:Button({
+    Title = "Reset Functions",
+    Desc = "Reset all Functions to default values",
+    Icon = "refresh-cw",
+    Callback = function()
+        Settings:reset()
+        notify("Functions Reset", "All Functions reset to defaults. Please reload script.", 5)
+    end
+})
+
+MiscTab:Section({
+    Title = "--Performance--"
 })
 
 MiscTab:Divider()
