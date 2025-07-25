@@ -1,5 +1,4 @@
--- Vuln
--- Vuln External Functions (DinoTable removed)
+-- Vuln External Functions
 local Vuln = {}
 
 -- State variables
@@ -38,7 +37,6 @@ function Vuln.getDinoTable()
     
     while attempt < maxAttempts do
         attempt = attempt + 1
-        print("Attempting to get dino table, attempt:", attempt)
         
         local success, result = pcall(function()
             -- Try multiple locations for the dino event
@@ -48,7 +46,6 @@ function Vuln.getDinoTable()
                 -- Look in ReplicatedStorage
                 dinoEvent = ReplicatedStorage:FindFirstChild("DinoEvent")
                 if dinoEvent then
-                    print("Found DinoEvent in ReplicatedStorage, moving to workspace")
                     dinoEvent.Parent = workspace
                 end
             end
@@ -61,7 +58,6 @@ function Vuln.getDinoTable()
                     if updateService then
                         dinoEvent = updateService:FindFirstChild("DinoEvent")
                         if dinoEvent then
-                            print("Found DinoEvent in UpdateService, moving to workspace")
                             dinoEvent.Parent = workspace
                         end
                     end
@@ -78,22 +74,18 @@ function Vuln.getDinoTable()
                 error("DinoCraftingTable not found")
             end
             
-            print("Successfully found crafting table:", craftingTable)
             return craftingTable
         end)
         
         if success and result then
-            print("Dino table acquired successfully")
             return result
         else
-            print("Failed to get dino table, attempt", attempt, "Error:", result)
             if attempt < maxAttempts then
                 task.wait(2) -- Wait before retry
             end
         end
     end
     
-    print("Failed to get dino table after", maxAttempts, "attempts")
     return nil
 end
 
@@ -101,17 +93,14 @@ end
 function Vuln.safeCraftingOperation(craftFunction, recipeName)
     local table = Vuln.getDinoTable()
     if not table then 
-        print("ERROR: Could not get dino table for", recipeName)
         return false
     end
     
-    print("Setting recipe for:", recipeName)
     local success = pcall(function()
         CraftingService:FireServer("SetRecipe", table, "DinoEventWorkbench", recipeName)
     end)
     
     if not success then
-        print("ERROR: Failed to set recipe for", recipeName)
         return false
     end
     
@@ -123,8 +112,6 @@ end
 -- Auto Dino Egg crafting function
 function Vuln.autoDinoEgg()
     return Vuln.safeCraftingOperation(function(table)
-        print("Crafting Dinosaur Egg - Looking for ingredients")
-        
         -- Find and input Common Egg (slot 1)
         local commonEggFound = false
         for _, tool in ipairs(Backpack:GetChildren()) do
@@ -140,10 +127,7 @@ function Vuln.autoDinoEgg()
                         })
                     end)
                     if success then
-                        print("Successfully input Common Egg")
                         commonEggFound = true
-                    else
-                        print("ERROR: Failed to input Common Egg")
                     end
                 end
                 tool.Parent = Backpack
@@ -152,7 +136,6 @@ function Vuln.autoDinoEgg()
         end
         
         if not commonEggFound then
-            print("ERROR: No Common Egg found in backpack")
             return false
         end
         
@@ -177,10 +160,7 @@ function Vuln.autoDinoEgg()
                         })
                     end)
                     if success then
-                        print("Successfully input Bone Blossom")
                         blossomFound = true
-                    else
-                        print("ERROR: Failed to input Bone Blossom")
                     end
                 end
                 tool.Parent = Backpack
@@ -189,30 +169,23 @@ function Vuln.autoDinoEgg()
         end
         
         if not blossomFound then
-            print("ERROR: No Bone Blossom found in backpack")
             return false
         end
         
         task.wait(0.3)
-        print("All ingredients input successfully - attempting to craft")
         local success = pcall(function()
             CraftingService:FireServer("Craft", table, "DinoEventWorkbench")
         end)
         
         if not success then
-            print("ERROR: Failed to craft Dinosaur Egg")
             return false
         end
         
-        print("Dinosaur Egg crafting completed successfully")
         task.wait(1.5)
         
         if teleportEnabled then 
-            print("Saving state before teleport - Teleport:", teleportEnabled)
             task.wait(1)
             TeleportService:Teleport(game.PlaceId) 
-        else
-            print("Auto-teleport disabled - continuing to craft more eggs")
         end
         return true
     end, "Dinosaur Egg")
@@ -221,8 +194,6 @@ end
 -- Auto Ancient Pack crafting function
 function Vuln.autoAncientPack()
     return Vuln.safeCraftingOperation(function(table)
-        print("Crafting Ancient Seed Pack")
-        
         -- Find and equip dinosaur egg
         local eggFound = false
         for _, tool in ipairs(Backpack:GetChildren()) do
@@ -237,9 +208,7 @@ function Vuln.autoAncientPack()
                             ItemData = { UUID = uuid }
                         })
                     end)
-                    if not success then
-                        print("ERROR: Failed to input Dinosaur Egg")
-                    else
+                    if success then
                         eggFound = true
                     end
                 end
@@ -249,7 +218,6 @@ function Vuln.autoAncientPack()
         end
         
         if not eggFound then
-            print("ERROR: No Dinosaur Egg found in backpack")
             return false
         end
         
@@ -259,14 +227,12 @@ function Vuln.autoAncientPack()
         end)
         
         if not success then
-            print("ERROR: Failed to craft Ancient Seed Pack")
             return false
         end
         
         task.wait(1.5)
         
         if teleportEnabled then 
-            print("Saving state before teleport - Teleport:", teleportEnabled)
             task.wait(1)
             TeleportService:Teleport(game.PlaceId) 
         end
@@ -277,8 +243,6 @@ end
 -- Auto Primal Egg crafting function
 function Vuln.autoPrimalEgg()
     return Vuln.safeCraftingOperation(function(table)
-        print("Crafting Primal Egg")
-        
         -- Find and equip dinosaur egg
         local eggFound = false
         for _, tool in ipairs(Backpack:GetChildren()) do
@@ -293,9 +257,7 @@ function Vuln.autoPrimalEgg()
                             ItemData = { UUID = uuid }
                         })
                     end)
-                    if not success then
-                        print("ERROR: Failed to input Dinosaur Egg")
-                    else
+                    if success then
                         eggFound = true
                     end
                 end
@@ -305,7 +267,6 @@ function Vuln.autoPrimalEgg()
         end
         
         if not eggFound then
-            print("ERROR: No Dinosaur Egg found in backpack")
             return false
         end
         
@@ -329,9 +290,7 @@ function Vuln.autoPrimalEgg()
                             ItemData = { UUID = uuid }
                         })
                     end)
-                    if not success then
-                        print("ERROR: Failed to input Bone Blossom")
-                    else
+                    if success then
                         blossomFound = true
                     end
                 end
@@ -341,7 +300,6 @@ function Vuln.autoPrimalEgg()
         end
         
         if not blossomFound then
-            print("ERROR: No Bone Blossom found in backpack")
             return false
         end
         
@@ -351,14 +309,12 @@ function Vuln.autoPrimalEgg()
         end)
         
         if not success then
-            print("ERROR: Failed to craft Primal Egg")
             return false
         end
         
         task.wait(1.5)
         
         if teleportEnabled then 
-            print("Saving state before teleport - Teleport:", teleportEnabled)
             task.wait(1)
             TeleportService:Teleport(game.PlaceId) 
         end
@@ -376,13 +332,11 @@ local craftFunctions = {
 -- Start auto craft function (now accepts teleportEnabled parameter)
 function Vuln.startAutoCraft(selectedItems, shouldTeleport)
     if not selectedItems or next(selectedItems) == nil then
-        print("No items selected for crafting")
         return
     end
     
     -- Update teleport setting for this crafting session
     teleportEnabled = shouldTeleport or false
-    print("Starting auto craft with teleport enabled:", teleportEnabled)
     
     -- Start crafting loop for selected items
     spawn(function()
@@ -393,7 +347,6 @@ function Vuln.startAutoCraft(selectedItems, shouldTeleport)
                     if craftFunc then
                         local success = safeCall(craftFunc, "craft" .. itemName:gsub(" ", ""))
                         if not success then
-                            print("Failed to craft", itemName, "- retrying in 3 seconds")
                             task.wait(3)
                         else
                             task.wait(1.5)
@@ -409,7 +362,6 @@ end
 -- Stop auto craft function
 function Vuln.stopAutoCraft()
     selectedCraftItems = {}
-    print("Auto craft stopped")
 end
 
 -- Setter functions for external use
