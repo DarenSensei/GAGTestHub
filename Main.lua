@@ -50,6 +50,8 @@ local player = Players.LocalPlayer
 local StarterGui = game:GetService("StarterGui")
 local playerGui = player:WaitForChild("PlayerGui")
 local userInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local PetMutationMachineService_RE = ReplicatedStorage.GameEvents.PetMutationMachineService_RE
 
 -- Variables initialization
 local selectedPets = {}
@@ -193,7 +195,7 @@ local MainTab = Window:Tab({
 
 MainTab:Paragraph({
     Title = "📜Changelogs : (v.1.2.5)",
-    Desc = "Added : Added Main : Local Player",
+    Desc = "Added : Added Vuln, ESP (Crops KG)",
     color = "#c7c0b7",
 })
 
@@ -266,17 +268,7 @@ MainTab:Button({
     Desc = "Rejoin the current server",
     Icon = "refresh-cw",
     Callback = function()
-        local success, error = pcall(function()
-            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
-        end)
-        if not success then
-            WindUI:Notify({
-                Title = "Error",
-                Content = "Failed to rejoin: " .. tostring(error),
-                Duration = 5,
-                Icon = "alert-triangle"
-            })
-        end
+        game:GetService("TeleportService"):Teleport(game.PlaceId, game:GetService("Players").LocalPlayer)
     end
 })
 
@@ -925,7 +917,7 @@ end
 local VulnTab = Window:Tab({
     Title = "Vuln",
     Icon = "syringe",
-    Desc = "Performance optimization and miscellaneous features"
+    Desc = "Vulnerable Data to Exploit"
 })
 
 VulnTab:Paragraph({
@@ -979,7 +971,7 @@ VulnTab:Dropdown({
 -- Toggle for auto rejoin (only sets the preference, doesn't start rejoin)
 VulnTab:Toggle({
     Title = "Auto Rejoin",
-    Value = false,
+    Value = true,
     Icon = "refresh-ccw",
     Callback = function(value)
         teleportEnabled = value
@@ -1047,6 +1039,76 @@ VulnTab:Button({
                 Icon = "x-circle"
             })
         end
+    end
+})
+
+VulnTab:Divider()
+
+VulnTab:Section({
+    Title = "--Pet Mutation--"
+})
+
+VulnTab:Paragraph({
+    Title = "Pet Mutation",
+    Desc = "Start Machine's Timer so the next time you put a pet, it will finish instantly (use the button for putting a pet)",
+    Icon = "zap"
+})
+
+VulnTab:Button({
+    Title = "Start Machine",
+    Icon = "play",
+    Callback = function()
+        if PetMutationMachineService_RE then
+            PetMutationMachineService_RE:FireServer("StartMachine")
+            
+            WindUI:Notify({
+                Title = "Success",
+                Content = "Machine Started!",
+                Duration = 2,
+                Icon = "check-circle"
+            })
+        end
+    end
+})
+
+VulnTab:Button({
+    Title = "Submit Held Pet",
+    Icon = "send",
+    Callback = function()
+        if PetMutationMachineService_RE then
+            PetMutationMachineService_RE:FireServer("SubmitHeldPet")
+            
+            WindUI:Notify({
+                Title = "Success",
+                Content = "Pet Submitted!",
+                Duration = 2,
+                Icon = "check-circle"
+            })
+        end
+    end
+})
+
+VulnTab:Divider()
+
+VulnTab:Section({
+        Title = "-- Zen Auto --"
+    })
+
+VulnTab:Button({
+    Title = "Zen Aura Submit",
+    Desc = "Submit all plants for Zen Aura",
+    Icon = "leaf",
+    Callback = function()
+        game:GetService("ReplicatedStorage").GameEvents.ZenAuraRemoteEvent:FireServer("SubmitAllPlants")
+    end
+})
+
+VulnTab:Button({
+    Title = "Zen Quest Submit", 
+    Desc = "Submit all plants for Zen Quest",
+    Icon = "target",
+    Callback = function()
+        game:GetService("ReplicatedStorage").GameEvents.ZenQuestRemoteEvent:FireServer("SubmitAllPlants")
     end
 })
 
@@ -1331,4 +1393,5 @@ Players.PlayerRemoving:Connect(function(playerLeaving)
 end)
 
 -- Final notification
+game:GetService("LogService"):ClearOutput()
 notify("Genzura Hub", "Genzura Hub loaded successfully! +999 Pogi Points! for you!", 4)
