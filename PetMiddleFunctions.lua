@@ -40,10 +40,11 @@ local petDropdown = nil
 local currentPetsList = {}
 local lastZoneAbilityTime = 0 -- Track last zone ability time
 
--- Universal Cooldown Variables
-local universalCooldownEnabled = false
-local universalCooldownConnection = nil
+-- Cooldown Timer Variables
+local cooldownTimerEnabled = false
+local cooldownTargetPetId = nil
 local cooldownDuration = 80 -- Default 80 seconds (1:20)
+local cooldownMonitorConnection = nil
 
 -- Function to check if string is UUID format
 function PetFunctions.isValidUUID(str)
@@ -229,66 +230,48 @@ function PetFunctions.getPetCooldown(petId)
     end
 end
 
--- Function to check if cooldown timer should block middle function (Universal)
+-- Function to check if cooldown timer should block middle function
 function PetFunctions.shouldBlockMiddleFunction()
-    if not universalCooldownEnabled then
-        return false -- Universal monitoring disabled, don't block
+    if not cooldownTimerEnabled or not cooldownTargetPetId then
+        return false -- No cooldown monitoring, don't block
     end
     
-    -- Get all included pets
-    local includedPetIds = PetFunctions.getIncludedPetIds()
+    -- Get the target pet's cooldown
+    local targetCooldown = PetFunctions.getPetCooldown(cooldownTargetPetId)
     
-    if #includedPetIds == 0 and not allPetsSelected then
-        return false -- No pets to monitor
+    if not targetCooldown then
+        return false -- Can't get cooldown, don't block
     end
     
-    local petsToCheck = {}
-    if allPetsSelected then
-        -- Check all pets
-        local allPets = PetFunctions.getAllPets()
-        for _, pet in pairs(allPets) do
-            table.insert(petsToCheck, pet.id)
-        end
-    else
-        -- Check only included pets
-        petsToCheck = includedPetIds
-    end
-    
-    -- Check each pet's cooldown
-    for _, petId in pairs(petsToCheck) do
-        local actualCooldown = PetFunctions.getPetCooldown(petId)
-        
-        if actualCooldown and actualCooldown > cooldownDuration then
-            -- At least one pet has cooldown above threshold, block middle function
-            return true
-        end
-    end
-    
-    -- All pets have cooldown at or below threshold, allow middle function
-    return false
+    -- Block if target pet's cooldown is above threshold
+    return targetCooldown > cooldownDuration
 end
 
--- Function to get remaining cooldown time (now shows worst case)
-function PetFunctions.getRemainingCooldownTime()
-    if not universalCooldownEnabled then
-        return 0
+-- Function to get target pet cooldown status
+function PetFunctions.getTargetPetCooldownStatus()
+    if not cooldownTimerEnabled or not cooldownTargetPetId then
+        return {
+            enabled = false,
+            targetPet = nil,
+            currentCooldown = 0,
+            threshold = cooldownDuration,
+            blocked = false,
+            timeUntilReady = 0
+        }
     end
     
-    local status, allReady = PetFunctions.getUniversalCooldownStatus()
+    local currentCooldown = PetFunctions.getPetCooldown(cooldownTargetPetId) or 0
+    local blocked = currentCooldown > cooldownDuration
+    local timeUntilReady = math.max(0, currentCooldown - cooldownDuration)
     
-    if type(status) ~= "table" or allReady then
-        return 0
-    end
-    
-    -- Return the longest time until any pet is ready
-    local maxTimeLeft = 0
-    for _, pet in pairs(status) do
-        if pet.timeLeft > maxTimeLeft then
-            maxTimeLeft = pet.timeLeft
-        end
-    end
-    
-    return maxTimeLeft
+    return {
+        enabled = true,
+        targetPet = cooldownTargetPetId,
+        currentCooldown = currentCooldown,
+        threshold = cooldownDuration,
+        blocked = blocked,
+        timeUntilReady = timeUntilReady
+    }
 end
 
 -- Function to format time for display (MM:SS)
@@ -298,105 +281,41 @@ function PetFunctions.formatTime(seconds)
     return string.format("%02d:%02d", minutes, secs)
 end
 
--- Function to get status of all monitored pets
-function PetFunctions.getUniversalCooldownStatus()
-    if not universalCooldownEnabled then
-        return "Universal monitoring disabled"
-    end
-    
-    local includedPetIds = PetFunctions.getIncludedPetIds()
-    local petsToCheck = {}
-    
-    if allPetsSelected then
-        local allPets = PetFunctions.getAllPets()
-        for _, pet in pairs(allPets) do
-            table.insert(petsToCheck, {id = pet.id, name = pet.name})
-        end
-    else
-        local allPets = PetFunctions.getAllPets()
-        for _, pet in pairs(allPets) do
-            if PetFunctions.isPetIncluded(pet.id) then
-                table.insert(petsToCheck, {id = pet.id, name = pet.name})
-            end
-        end
-    end
-    
-    local status = {}
-    local allReady = true
-    
-    for _, pet in pairs(petsToCheck) do
-        local actualCooldown = PetFunctions.getPetCooldown(pet.id) or 0
-        local isReady = actualCooldown <= cooldownDuration
-        
-        table.insert(status, {
-            name = pet.name,
-            id = pet.id,
-            cooldown = actualCooldown,
-            ready = isReady,
-            timeLeft = math.max(0, actualCooldown - cooldownDuration)
-        })
-        
-        if not isReady then
-            allReady = false
-        end
-    end
-    
-    return status, allReady
-end
-
--- Function to start universal cooldown monitoring
-function PetFunctions.startUniversalCooldownMonitoring(thresholdDuration)
+-- Function to start cooldown monitoring
+function PetFunctions.startCooldownMonitoring(targetPetId, thresholdDuration)
     -- Stop any existing monitoring
-    PetFunctions.stopUniversalCooldownMonitoring()
+    PetFunctions.stopCooldownMonitoring()
     
+    cooldownTargetPetId = targetPetId
     cooldownDuration = thresholdDuration or 80
-    universalCooldownEnabled = true
+    cooldownTimerEnabled = true
     
-    print("Started universal cooldown monitoring for all included pets")
+    print("Started cooldown monitoring for pet: " .. tostring(targetPetId))
     print("Threshold: " .. PetFunctions.formatTime(cooldownDuration))
     
     -- Set up monitoring connection
-    universalCooldownConnection = RunService.Heartbeat:Connect(function()
-        if not universalCooldownEnabled then
+    cooldownMonitorConnection = RunService.Heartbeat:Connect(function()
+        if not cooldownTimerEnabled then
             return
         end
         
-        -- Optional: Log status every few seconds
-        -- You can uncomment this for debugging
-        --[[
-        local status, allReady = PetFunctions.getUniversalCooldownStatus()
-        if type(status) == "table" then
-            local readyCount = 0
-            for _, pet in pairs(status) do
-                if pet.ready then readyCount = readyCount + 1 end
-            end
-            print("Pets ready: " .. readyCount .. "/" .. #status .. " | Middle function: " .. (allReady and "ACTIVE" or "BLOCKED"))
-        end
-        ]]--
+        -- Monitor the target pet's cooldown
+        local status = PetFunctions.getTargetPetCooldownStatus()
+        -- You can add debugging here if needed
     end)
 end
 
--- Function to stop universal cooldown monitoring
-function PetFunctions.stopUniversalCooldownMonitoring()
-    universalCooldownEnabled = false
+-- Function to stop cooldown monitoring
+function PetFunctions.stopCooldownMonitoring()
+    cooldownTimerEnabled = false
+    cooldownTargetPetId = nil
     
-    if universalCooldownConnection then
-        universalCooldownConnection:Disconnect()
-        universalCooldownConnection = nil
+    if cooldownMonitorConnection then
+        cooldownMonitorConnection:Disconnect()
+        cooldownMonitorConnection = nil
     end
     
-    print("Stopped universal cooldown monitoring")
-end
-
--- Legacy functions for compatibility (now redirect to universal system)
-function PetFunctions.startCooldownTimer(petId, thresholdDuration)
-    -- Redirect to universal system
-    PetFunctions.startUniversalCooldownMonitoring(thresholdDuration)
-end
-
-function PetFunctions.stopCooldownTimer()
-    -- Redirect to universal system
-    PetFunctions.stopUniversalCooldownMonitoring()
+    print("Stopped cooldown monitoring")
 end
 
 -- Function to run the auto middle loop (modified to respect cooldown timer)
@@ -405,7 +324,7 @@ function PetFunctions.runAutoMiddleLoop()
     
     -- Check if cooldown timer should block the middle function
     if PetFunctions.shouldBlockMiddleFunction() then
-        return
+        return -- Block execution when target pet cooldown is above threshold
     end
 
     local pets = PetFunctions.getAllPets()
@@ -483,9 +402,9 @@ end
 function PetFunctions.startAutoMiddleWithCooldownTimer()
     if not autoMiddleEnabled then return end
     
-    -- If universal cooldown is enabled, start monitoring
-    if universalCooldownEnabled and cooldownDuration > 0 then
-        PetFunctions.startUniversalCooldownMonitoring(cooldownDuration)
+    -- If cooldown monitoring is enabled, ensure it's running
+    if cooldownTimerEnabled and cooldownTargetPetId then
+        PetFunctions.startCooldownMonitoring(cooldownTargetPetId, cooldownDuration)
     end
     
     -- Setup listeners and start the main loop
@@ -548,7 +467,7 @@ end
 -- Function to cleanup all timers and connections
 function PetFunctions.cleanup()
     PetFunctions.stopLoop()
-    PetFunctions.stopUniversalCooldownMonitoring()
+    PetFunctions.stopCooldownMonitoring()
 
     if zoneAbilityConnection then
         zoneAbilityConnection:Disconnect()
@@ -608,22 +527,18 @@ function PetFunctions.updateDropdownOptions()
     end
 end
 
--- Function to get pets available for cooldown timer (only included pets)
-function PetFunctions.getCooldownTimerPets()
-    local pets = PetFunctions.getAllPets()
-    local availablePets = {"None"}
-    local petMap = {}
-    
-    for _, pet in pairs(pets) do
-        -- Only include pets that are in the middle function
-        if PetFunctions.isPetIncluded(pet.id) or allPetsSelected then
-            local displayName = pet.name .. " (" .. string.sub(pet.id, 2, 9) .. "...)"
-            table.insert(availablePets, displayName)
-            petMap[displayName] = pet.id
-        end
+-- Function to get first pet ID from a pet type group
+function PetFunctions.getFirstPetFromType(petType)
+    if not currentPetsList or not currentPetsList[petType] then
+        return nil
     end
     
-    return availablePets, petMap
+    local petGroup = currentPetsList[petType]
+    if type(petGroup) == "table" and #petGroup > 0 then
+        return petGroup[1].id
+    end
+    
+    return nil
 end
 
 -- Function to refresh pets
@@ -746,9 +661,17 @@ function PetFunctions.getCurrentPetsList()
     return currentPetsList
 end
 
--- Universal Cooldown Getters and Setters
-function PetFunctions.getUniversalCooldownEnabled()
-    return universalCooldownEnabled
+-- Cooldown Timer Getters and Setters
+function PetFunctions.getCooldownTimerEnabled()
+    return cooldownTimerEnabled
+end
+
+function PetFunctions.getCooldownTargetPetId()
+    return cooldownTargetPetId
+end
+
+function PetFunctions.setCooldownTargetPet(petId)
+    cooldownTargetPetId = petId
 end
 
 function PetFunctions.getCooldownDuration()
@@ -759,19 +682,18 @@ function PetFunctions.setCooldownDuration(duration)
     cooldownDuration = duration
 end
 
--- Legacy compatibility functions (deprecated but maintained for backward compatibility)
-function PetFunctions.getCooldownTimerEnabled()
-    return universalCooldownEnabled
+-- Legacy functions for compatibility
+function PetFunctions.startCooldownTimer(petId, duration)
+    PetFunctions.startCooldownMonitoring(petId, duration)
 end
 
-function PetFunctions.getCooldownTargetPetId()
-    -- Return nil since universal monitoring doesn't target specific pets
-    return nil
+function PetFunctions.stopCooldownTimer()
+    PetFunctions.stopCooldownMonitoring()
 end
 
-function PetFunctions.setCooldownTargetPet(petId)
-    -- This function is now deprecated with universal monitoring
-    warn("setCooldownTargetPet is deprecated. Use universal cooldown monitoring instead.")
+function PetFunctions.getRemainingCooldownTime()
+    local status = PetFunctions.getTargetPetCooldownStatus()
+    return status.timeUntilReady or 0
 end
 
 -- Initialize the system with auto refresh
@@ -792,12 +714,11 @@ _G.getIncludedPetIds = PetFunctions.getIncludedPetIds
 _G.includePet = PetFunctions.includePet
 _G.unincludePet = PetFunctions.unincludePet
 
--- Make universal cooldown functions available globally
-_G.startUniversalCooldownMonitoring = PetFunctions.startUniversalCooldownMonitoring
-_G.stopUniversalCooldownMonitoring = PetFunctions.stopUniversalCooldownMonitoring
-_G.getUniversalCooldownStatus = PetFunctions.getUniversalCooldownStatus
+-- Make cooldown functions available globally
+_G.startCooldownMonitoring = PetFunctions.startCooldownMonitoring
+_G.stopCooldownMonitoring = PetFunctions.stopCooldownMonitoring
+_G.getTargetPetCooldownStatus = PetFunctions.getTargetPetCooldownStatus
 _G.getRemainingCooldownTime = PetFunctions.getRemainingCooldownTime
-_G.getCooldownTimerPets = PetFunctions.getCooldownTimerPets
 
 -- Legacy global functions for backward compatibility
 _G.startCooldownTimer = PetFunctions.startCooldownTimer
