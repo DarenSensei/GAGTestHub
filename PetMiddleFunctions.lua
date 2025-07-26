@@ -11,8 +11,8 @@ local RunService = game:GetService("RunService")
 
 -- Pet Radius Control Configuration
 local RADIUS = 3
-local LOOP_DELAY = 3
-local INITIAL_LOOP_TIME = 5
+local LOOP_DELAY = 1
+local INITIAL_LOOP_TIME = 3
 local ZONE_ABILITY_DELAY = 1
 local ZONE_ABILITY_LOOP_TIME = 3
 local AUTO_LOOP_INTERVAL = 240 -- 4 minutes in seconds
