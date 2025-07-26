@@ -318,6 +318,20 @@ function PetFunctions.stopCooldownMonitoring()
     print("Stopped cooldown monitoring")
 end
 
+-- Function to get first pet ID from a pet type group
+function PetFunctions.getFirstPetFromType(petType)
+    if not currentPetsList or not currentPetsList[petType] then
+        return nil
+    end
+    
+    local petGroup = currentPetsList[petType]
+    if type(petGroup) == "table" and #petGroup > 0 then
+        return petGroup[1].id
+    end
+    
+    return nil
+end
+
 -- Function to run the auto middle loop (modified to respect cooldown timer)
 function PetFunctions.runAutoMiddleLoop()
     if not autoMiddleEnabled then return end
@@ -525,20 +539,6 @@ function PetFunctions.updateDropdownOptions()
     if petDropdown and petDropdown.Refresh then
         petDropdown:Refresh(dropdownOptions, true)
     end
-end
-
--- Function to get first pet ID from a pet type group
-function PetFunctions.getFirstPetFromType(petType)
-    if not currentPetsList or not currentPetsList[petType] then
-        return nil
-    end
-    
-    local petGroup = currentPetsList[petType]
-    if type(petGroup) == "table" and #petGroup > 0 then
-        return petGroup[1].id
-    end
-    
-    return nil
 end
 
 -- Function to refresh pets
