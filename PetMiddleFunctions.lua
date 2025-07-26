@@ -21,6 +21,7 @@ local AUTO_LOOP_INTERVAL = 240 -- 4 minutes in seconds
 local ActivePetService = ReplicatedStorage.GameEvents.ActivePetService
 local PetZoneAbility = ReplicatedStorage.GameEvents.PetZoneAbility
 local Notification = ReplicatedStorage.GameEvents.Notification
+local GetPetCooldown = ReplicatedStorage.GameEvents.GetPetCooldown
 
 -- Pet Control Variables
 local activePetUI = nil
@@ -38,6 +39,14 @@ local isLooping = false
 local petDropdown = nil
 local currentPetsList = {}
 local lastZoneAbilityTime = 0 -- Track last zone ability time
+
+-- Cooldown Timer Variables
+local cooldownTimerEnabled = false
+local cooldownTargetPetId = nil
+local cooldownDuration = 80 -- Default 80 seconds (1:20)
+local cooldownTimer = nil
+local cooldownStartTime = 0
+local cooldownConnection = nil
 
 -- Function to check if string is UUID format
 function PetFunctions.isValidUUID(str)
@@ -208,9 +217,95 @@ function PetFunctions.setPetState(petId, state)
     end)
 end
 
--- Function to run the auto middle loop
+-- Function to get pet cooldown
+function PetFunctions.getPetCooldown(petId)
+    local formattedPetId = PetFunctions.formatPetIdToUUID(petId)
+    local success, result = pcall(function()
+        return GetPetCooldown:InvokeServer(formattedPetId)
+    end)
+    
+    if success then
+        return result
+    else
+        warn("Failed to get pet cooldown for " .. tostring(petId) .. ": " .. tostring(result))
+        return nil
+    end
+end
+
+-- Function to check if cooldown timer should block middle function
+function PetFunctions.shouldBlockMiddleFunction()
+    if not cooldownTimerEnabled or not cooldownTargetPetId then
+        return false
+    end
+    
+    -- Check if we're still within the cooldown period
+    local elapsedTime = tick() - cooldownStartTime
+    return elapsedTime < cooldownDuration
+end
+
+-- Function to get remaining cooldown time
+function PetFunctions.getRemainingCooldownTime()
+    if not cooldownTimerEnabled or not cooldownTargetPetId then
+        return 0
+    end
+    
+    local elapsedTime = tick() - cooldownStartTime
+    local remaining = cooldownDuration - elapsedTime
+    return math.max(0, remaining)
+end
+
+-- Function to format time for display (MM:SS)
+function PetFunctions.formatTime(seconds)
+    local minutes = math.floor(seconds / 60)
+    local secs = math.floor(seconds % 60)
+    return string.format("%02d:%02d", minutes, secs)
+end
+
+-- Function to start cooldown timer
+function PetFunctions.startCooldownTimer(petId, duration)
+    -- Stop any existing cooldown timer
+    PetFunctions.stopCooldownTimer()
+    
+    cooldownTargetPetId = petId
+    cooldownDuration = duration or 80
+    cooldownTimerEnabled = true
+    cooldownStartTime = tick()
+    
+    -- Set up timer connection to monitor progress
+    cooldownConnection = RunService.Heartbeat:Connect(function()
+        local remaining = PetFunctions.getRemainingCooldownTime()
+        
+        if remaining <= 0 then
+            PetFunctions.stopCooldownTimer()
+        end
+    end)
+end
+
+-- Function to stop cooldown timer
+function PetFunctions.stopCooldownTimer()
+    cooldownTimerEnabled = false
+    cooldownTargetPetId = nil
+    cooldownStartTime = 0
+    
+    if cooldownConnection then
+        cooldownConnection:Disconnect()
+        cooldownConnection = nil
+    end
+    
+    if cooldownTimer then
+        task.cancel(cooldownTimer)
+        cooldownTimer = nil
+    end
+end
+
+-- Function to run the auto middle loop (modified to respect cooldown timer)
 function PetFunctions.runAutoMiddleLoop()
     if not autoMiddleEnabled then return end
+    
+    -- Check if cooldown timer should block the middle function
+    if PetFunctions.shouldBlockMiddleFunction() then
+        return
+    end
 
     local pets = PetFunctions.getAllPets()
     local farmCenterPoint = PetFunctions.getFarmCenterPoint()
@@ -283,6 +378,21 @@ function PetFunctions.startInitialLoop()
     end)
 end
 
+-- Function to start the auto middle system with cooldown timer integration
+function PetFunctions.startAutoMiddleWithCooldownTimer()
+    if not autoMiddleEnabled then return end
+    
+    -- If we have a cooldown target pet, start the cooldown timer
+    if cooldownTargetPetId and cooldownDuration > 0 then
+        PetFunctions.startCooldownTimer(cooldownTargetPetId, cooldownDuration)
+    end
+    
+    -- Setup listeners and start the main loop
+    PetFunctions.setupZoneAbilityListener()
+    PetFunctions.setupNotificationListener()
+    PetFunctions.startInitialLoop()
+end
+
 -- Function to handle PetZoneAbility detection
 function PetFunctions.onPetZoneAbility()
     if not autoMiddleEnabled then return end
@@ -337,6 +447,7 @@ end
 -- Function to cleanup all timers and connections
 function PetFunctions.cleanup()
     PetFunctions.stopLoop()
+    PetFunctions.stopCooldownTimer()
 
     if zoneAbilityConnection then
         zoneAbilityConnection:Disconnect()
@@ -394,6 +505,24 @@ function PetFunctions.updateDropdownOptions()
     if petDropdown and petDropdown.Refresh then
         petDropdown:Refresh(dropdownOptions, true)
     end
+end
+
+-- Function to get pets available for cooldown timer (only included pets)
+function PetFunctions.getCooldownTimerPets()
+    local pets = PetFunctions.getAllPets()
+    local availablePets = {"None"}
+    local petMap = {}
+    
+    for _, pet in pairs(pets) do
+        -- Only include pets that are in the middle function
+        if PetFunctions.isPetIncluded(pet.id) or allPetsSelected then
+            local displayName = pet.name .. " (" .. string.sub(pet.id, 2, 9) .. "...)"
+            table.insert(availablePets, displayName)
+            petMap[displayName] = pet.id
+        end
+    end
+    
+    return availablePets, petMap
 end
 
 -- Function to refresh pets
@@ -516,6 +645,27 @@ function PetFunctions.getCurrentPetsList()
     return currentPetsList
 end
 
+-- Cooldown Timer Getters and Setters
+function PetFunctions.getCooldownTimerEnabled()
+    return cooldownTimerEnabled
+end
+
+function PetFunctions.getCooldownTargetPetId()
+    return cooldownTargetPetId
+end
+
+function PetFunctions.setCooldownTargetPet(petId)
+    cooldownTargetPetId = petId
+end
+
+function PetFunctions.getCooldownDuration()
+    return cooldownDuration
+end
+
+function PetFunctions.setCooldownDuration(duration)
+    cooldownDuration = duration
+end
+
 -- Initialize the system with auto refresh
 task.spawn(function()
     task.wait(1) -- Wait a moment for everything to load
@@ -533,5 +683,11 @@ _G.getIncludedPetCount = PetFunctions.getIncludedPetCount
 _G.getIncludedPetIds = PetFunctions.getIncludedPetIds
 _G.includePet = PetFunctions.includePet
 _G.unincludePet = PetFunctions.unincludePet
+
+-- Make cooldown functions available globally
+_G.startCooldownTimer = PetFunctions.startCooldownTimer
+_G.stopCooldownTimer = PetFunctions.stopCooldownTimer
+_G.getRemainingCooldownTime = PetFunctions.getRemainingCooldownTime
+_G.getCooldownTimerPets = PetFunctions.getCooldownTimerPets
 
 return PetFunctions
