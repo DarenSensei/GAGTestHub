@@ -423,7 +423,14 @@ function CoreFunctions.isTargetPlant(Plant)
     -- Check mutations
     local mutations = CoreFunctions.getPlantMutations(Plant)
     
-    -- Check whitelist (if specified)
+    -- Check blacklist first
+    for _, mutation in ipairs(mutations) do
+        if blacklistMutations[mutation] then
+            return false
+        end
+    end
+    
+    -- Check whitelist (only if specified)
     local whitelistCount = 0
     for _ in pairs(whitelistMutations) do whitelistCount = whitelistCount + 1 end
     
@@ -436,13 +443,6 @@ function CoreFunctions.isTargetPlant(Plant)
             end
         end
         if not hasWhitelistMutation then return false end
-    end
-    
-    -- Check blacklist
-    for _, mutation in ipairs(mutations) do
-        if blacklistMutations[mutation] then
-            return false
-        end
     end
     
     return true
