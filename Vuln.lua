@@ -28,28 +28,46 @@ local blacklistedItems = {
     "Corrupted Kodama"
 }
 
+-- Function to ensure Fruit Items tab is selected
+local function selectFruitItemsTab()
+    local backpackGui = player:WaitForChild("PlayerGui"):WaitForChild("BackpackGui")
+    local inventory = backpackGui:WaitForChild("Backpack"):WaitForChild("Inventory")
+    local selector = inventory:WaitForChild("VRInventorySelector")
+    
+    -- Find and click the Fruit Items button
+    for _, child in pairs(selector:GetChildren()) do
+        if child:IsA("TextButton") and child.Text == "Fruit Items" then
+            -- Simulate clicking the Fruit Items tab
+            child.MouseButton1Click:Fire()
+            task.wait(0.1)
+            break
+        end
+    end
+end
+
 -- Functions
 function vuln.findAndEquipFruit(fruitType)
     if not player.Character then return false end
     local backpack = player:FindFirstChild("Backpack")
     if not backpack then return false end
     
+    -- Ensure Fruit Items tab is selected
+    selectFruitItemsTab()
+    
     for _, item in pairs(backpack:GetChildren()) do
         if item:IsA("Tool") and string.find(item.Name, fruitType) then
-            -- Check if item is blacklisted
-            local isBlacklisted = false
+            -- Skip if item is blacklisted
             for _, blacklistedName in pairs(blacklistedItems) do
                 if item.Name == blacklistedName then
-                    isBlacklisted = true
-                    break
+                    goto continue
                 end
             end
             
-            -- Only equip if not blacklisted
-            if not isBlacklisted then
-                item.Parent = player.Character
-                return true
-            end
+            -- Equip the item if it's not blacklisted
+            item.Parent = player.Character
+            return true
+            
+            ::continue::
         end
     end
     return false
