@@ -27,45 +27,49 @@ local blacklistedItems = {
     "Tranquil Staff",
     "Corrupted Kodama"
 }
-
--- Function to ensure Fruit Items tab is selected
-local function selectFruitItemsTab()
-    local backpackGui = player:WaitForChild("PlayerGui"):WaitForChild("BackpackGui")
-    local inventory = backpackGui:WaitForChild("Backpack"):WaitForChild("Inventory")
-    local selector = inventory:WaitForChild("VRInventorySelector")
-
+-- update check
 -- Functions
 function vuln.findAndEquipFruit(fruitType)
     if not player.Character then return false end
     local backpack = player:FindFirstChild("Backpack")
     if not backpack then return false end
     
-    -- Ensure Fruit Items tab is selected
-    selectFruitItemsTab()
-    
+    -- First, create a table of non-blacklisted items
+    local validItems = {}
     for _, item in pairs(backpack:GetChildren()) do
-        if item:IsA("Tool") and string.find(item.Name, fruitType) then
-            -- Skip if item is blacklisted
+        if item:IsA("Tool") then
+            local isBlacklisted = false
             for _, blacklistedName in pairs(blacklistedItems) do
                 if item.Name == blacklistedName then
-                    goto continue
+                    isBlacklisted = true
+                    break
                 end
             end
             
-            -- Equip the item if it's not blacklisted
-            item.Parent = player.Character
-            return true
-            
-            ::continue::
+            -- Only add to valid items if not blacklisted
+            if not isBlacklisted then
+                table.insert(validItems, item)
+            end
         end
     end
+    
+    -- Now search through valid items for the fruit type
+    for _, item in pairs(validItems) do
+        if string.find(item.Name, fruitType) then
+            item.Parent = player.Character
+            return true
+        end
+    end
+    
     return false
 end
+
 function vuln.submitToFox()
     if ZenQuestRemoteEvent then
         ZenQuestRemoteEvent:FireServer("SubmitToFox")
     end
 end
+
 function vuln.returnItemToBackpack()
     if not player.Character then return end
     local backpack = player:FindFirstChild("Backpack")
@@ -77,6 +81,7 @@ function vuln.returnItemToBackpack()
         end
     end
 end
+
 function vuln.autoVulnSubmission()
     if not autoVulnEnabled then return end
     
@@ -98,9 +103,11 @@ function vuln.autoVulnSubmission()
         task.wait(0.5)
     end
 end
+
 function vuln.getAutoVulnStatus()
     return autoVulnEnabled
 end
+
 function vuln.toggleAutoVuln(enabled)
     autoVulnEnabled = enabled
     
@@ -128,4 +135,5 @@ function vuln.toggleAutoVuln(enabled)
         return true, "Auto Vuln Submission Stopped"
     end
 end
+
 return vuln
