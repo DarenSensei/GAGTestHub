@@ -1,5 +1,7 @@
 local vuln = {}
 
+local ZenQuestRemoteEvent = ReplicatedStorage.GameEvents.ZenQuestRemoteEvent
+
 -- Functions
 function vuln.findAndEquipFruit(fruitType)
     if not player.Character then return false end
