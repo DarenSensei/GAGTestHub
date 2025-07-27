@@ -1,6 +1,19 @@
-local vuln = {}
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local ZenQuestRemoteEvent = ReplicatedStorage.GameEvents.ZenQuestRemoteEvent
+local player = Players.LocalPlayer
+
+-- Wait for ReplicatedStorage to load GameEvents
+local GameEvents = ReplicatedStorage:WaitForChild("GameEvents")
+local ZenQuestRemoteEvent = GameEvents:WaitForChild("ZenQuestRemoteEvent")
+
+-- Configuration
+local autoVulnEnabled = false
+local autoVulnConnection = nil
+
+-- External module
+local vuln = {}
 
 -- Functions
 function vuln.findAndEquipFruit(fruitType)
