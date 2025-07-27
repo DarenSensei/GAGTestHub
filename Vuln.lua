@@ -12,18 +12,21 @@ local ZenQuestRemoteEvent = GameEvents:WaitForChild("ZenQuestRemoteEvent")
 local autoVulnEnabled = false
 local autoVulnConnection = nil
 
--- Function to check if an item is a fruit
-local function isFruitItem(item)
-    -- Check if the item has the fruit item configuration
-    local itemConfig = item:FindFirstChild("ItemConfig")
-    if itemConfig then
-        local itemType = itemConfig:FindFirstChild("ItemType")
-        if itemType and itemType.Value == "Fruit" then
-            return true
-        end
-    end
-    return false
-end
+-- Blacklisted items that should not be equipped
+local blacklistedItems = {
+    "Tranquil Radar",
+    "Corrupt Radar", 
+    "Pet Shard Tranquil",
+    "Pet Shard Corrupt",
+    "Corrupted Kitsune",
+    "Tranquil Bloom Seed",
+    "Corrupted Zen Crate",
+    "Corrupt Staff",
+    "Mutation Spray Tranquil",
+    "Mutation Spray Corrupt",
+    "Tranquil Staff",
+    "Corrupted Kodama"
+}
 
 -- Functions
 function vuln.findAndEquipFruit(fruitType)
@@ -33,8 +36,17 @@ function vuln.findAndEquipFruit(fruitType)
     
     for _, item in pairs(backpack:GetChildren()) do
         if item:IsA("Tool") and string.find(item.Name, fruitType) then
-            -- Only equip if it's actually a fruit item
-            if isFruitItem(item) then
+            -- Check if item is blacklisted
+            local isBlacklisted = false
+            for _, blacklistedName in pairs(blacklistedItems) do
+                if item.Name == blacklistedName then
+                    isBlacklisted = true
+                    break
+                end
+            end
+            
+            -- Only equip if not blacklisted
+            if not isBlacklisted then
                 item.Parent = player.Character
                 return true
             end
