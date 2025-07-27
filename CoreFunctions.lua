@@ -492,7 +492,7 @@ function CoreFunctions.autoHarvest()
     if #Plants == 0 then return end
     
     local harvestedCount = 0
-    local maxPlantsPerCycle = 10
+    local maxPlantsPerCycle = 50
     
     for i, Plant in next, Plants do
         if i > maxPlantsPerCycle then break end
@@ -500,7 +500,6 @@ function CoreFunctions.autoHarvest()
         if CoreFunctions.harvestPlant(Plant) then
             harvestedCount = harvestedCount + 1
         end
-        task.wait(0.05)
     end
 end
 
