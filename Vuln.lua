@@ -33,17 +33,6 @@ local function selectFruitItemsTab()
     local backpackGui = player:WaitForChild("PlayerGui"):WaitForChild("BackpackGui")
     local inventory = backpackGui:WaitForChild("Backpack"):WaitForChild("Inventory")
     local selector = inventory:WaitForChild("VRInventorySelector")
-    
-    -- Find and click the Fruit Items button
-    for _, child in pairs(selector:GetChildren()) do
-        if child:IsA("TextButton") and child.Text == "Fruit Items" then
-            -- Simulate clicking the Fruit Items tab
-            child.MouseButton1Click:Fire()
-            task.wait(0.1)
-            break
-        end
-    end
-end
 
 -- Functions
 function vuln.findAndEquipFruit(fruitType)
