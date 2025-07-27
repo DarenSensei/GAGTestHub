@@ -28,16 +28,14 @@ local blacklistedItems = {
     "Corrupted Kodama"
 }
 -- update check
--- Functions
 function vuln.findAndEquipFruit(fruitType)
     if not player.Character then return false end
     local backpack = player:FindFirstChild("Backpack")
     if not backpack then return false end
     
-    -- First, create a table of non-blacklisted items
-    local validItems = {}
     for _, item in pairs(backpack:GetChildren()) do
-        if item:IsA("Tool") then
+        if item:IsA("Tool") and string.find(item.Name, fruitType) then
+            -- Check if item is blacklisted
             local isBlacklisted = false
             for _, blacklistedName in pairs(blacklistedItems) do
                 if item.Name == blacklistedName then
@@ -46,21 +44,13 @@ function vuln.findAndEquipFruit(fruitType)
                 end
             end
             
-            -- Only add to valid items if not blacklisted
+            -- Only equip if not blacklisted
             if not isBlacklisted then
-                table.insert(validItems, item)
+                item.Parent = player.Character
+                return true
             end
         end
     end
-    
-    -- Now search through valid items for the fruit type
-    for _, item in pairs(validItems) do
-        if string.find(item.Name, fruitType) then
-            item.Parent = player.Character
-            return true
-        end
-    end
-    
     return false
 end
 
@@ -69,7 +59,6 @@ function vuln.submitToFox()
         ZenQuestRemoteEvent:FireServer("SubmitToFox")
     end
 end
-
 function vuln.returnItemToBackpack()
     if not player.Character then return end
     local backpack = player:FindFirstChild("Backpack")
@@ -81,7 +70,6 @@ function vuln.returnItemToBackpack()
         end
     end
 end
-
 function vuln.autoVulnSubmission()
     if not autoVulnEnabled then return end
     
@@ -103,11 +91,9 @@ function vuln.autoVulnSubmission()
         task.wait(0.5)
     end
 end
-
 function vuln.getAutoVulnStatus()
     return autoVulnEnabled
 end
-
 function vuln.toggleAutoVuln(enabled)
     autoVulnEnabled = enabled
     
@@ -135,5 +121,4 @@ function vuln.toggleAutoVuln(enabled)
         return true, "Auto Vuln Submission Stopped"
     end
 end
-
 return vuln
