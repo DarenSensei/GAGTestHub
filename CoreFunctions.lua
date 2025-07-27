@@ -376,38 +376,12 @@ end
 -- AUTO COLLECT
 -- ==========================================
 
---// Services
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-
-local LocalPlayer = Players.LocalPlayer
-local Farms = workspace.Farm
-
---// Mutation Data
-local Mutations = {
-    Amber = 10, AncientAmber = 50, Aurora = 90, Bloodlit = 5, Burnt = 4,
-    Celestial = 120, Ceramic = 30, Chakra = 15, Chilled = 2, Choc = 2,
-    Clay = 5, Cloudtouched = 5, Cooked = 10, Dawnbound = 150, Disco = 125,
-    Drenched = 5, Eclipsed = 15, Enlightened = 35, FoxfireChakra = 90,
-    Friendbound = 70, Frozen = 10, Galactic = 120, Gold = 20, Heavenly = 5,
-    HoneyGlazed = 5, Infected = 75, Molten = 25, Moonlit = 2, Meteoric = 125,
-    OldAmber = 20, Paradisal = 100, Plasma = 5, Pollinated = 3, Radioactive = 80,
-    Rainbow = 50, Sandy = 3, Shocked = 100, Sundried = 85, Tempestuous = 19,
-    Toxic = 12, Tranquil = 20, Twisted = 5, Verdant = 5, Voidtouched = 135,
-    Wet = 2, Windstruck = 2, Wiltproof = 4, Zombified = 25
-}
-
---// Configuration
-local selectedCrops = {}
-local whitelistMutations = {}
-local blacklistMutations = {}
-local autoHarvestEnabled = false
-local autoHarvestConnection = nil
-
 --// Functions
 function CoreFunctions.getCurrentFarm()
-    for _, Farm in next, Farms:GetChildren() do
+    local farm = workspace:FindFirstChild("Farm")
+    if not farm then return nil end
+    
+    for _, Farm in next, farm:GetChildren() do
         local Important = Farm:FindFirstChild("Important")
         if Important then
             local Data = Important:FindFirstChild("Data")
@@ -515,17 +489,25 @@ function CoreFunctions.autoHarvest()
     if not autoHarvestEnabled then return end
     
     local Plants = CoreFunctions.getCropsToHarvest()
-    local harvestedCount = 0
+    if #Plants == 0 then return end
     
-    for _, Plant in next, Plants do
+    local harvestedCount = 0
+    local maxPlantsPerCycle = 10
+    
+    for i, Plant in next, Plants do
+        if i > maxPlantsPerCycle then break end
+        
         if CoreFunctions.harvestPlant(Plant) then
             harvestedCount = harvestedCount + 1
         end
-        task.wait(0.01)
+        task.wait(0.05)
     end
 end
 
 function CoreFunctions.getCropTypes()
+    local farm = workspace:FindFirstChild("Farm")
+    if not farm then return {"All Plants"} end
+    
     local MyFarm = CoreFunctions.getCurrentFarm()
     if not MyFarm then return {"All Plants"} end
     
@@ -539,7 +521,7 @@ function CoreFunctions.getCropTypes()
     local addedTypes = {}
     
     for _, plant in pairs(PlantsPhysical:GetChildren()) do
-        if not addedTypes[plant.Name] then
+        if plant.Name and not addedTypes[plant.Name] then
             table.insert(cropTypes, plant.Name)
             addedTypes[plant.Name] = true
         end
@@ -577,21 +559,25 @@ function CoreFunctions.toggleAutoHarvest(enabled)
     autoHarvestEnabled = enabled
     
     if enabled then
-        if autoHarvestConnection then autoHarvestConnection:Disconnect() end
+        if autoHarvestConnection then 
+            autoHarvestConnection:Disconnect() 
+            autoHarvestConnection = nil
+        end
         
-        autoHarvestConnection = RunService.Heartbeat:Connect(function()
+        autoHarvestConnection = task.spawn(function()
             while autoHarvestEnabled do
                 CoreFunctions.autoHarvest()
-                task.wait(3)
+                task.wait(2)
             end
         end)
         
         return true, "Auto Harvest Started"
     else
         if autoHarvestConnection then
-            autoHarvestConnection:Disconnect()
+            task.cancel(autoHarvestConnection)
             autoHarvestConnection = nil
         end
+        autoHarvestEnabled = false
         
         return true, "Auto Harvest Stopped"
     end
