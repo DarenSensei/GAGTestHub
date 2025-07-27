@@ -376,9 +376,6 @@ end
 -- AUTO COLLECT
 -- ==========================================
 
---// Services
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 --// Functions
 function CoreFunctions.getCurrentFarm()
     local farm = workspace:FindFirstChild("Farm")
@@ -507,18 +504,18 @@ function CoreFunctions.getCropsToHarvest()
 end
 
 function CoreFunctions.harvestPlant(PlantData)
-    local HarvestRemote = ReplicatedStorage:FindFirstChild("GameEvents")
-    if HarvestRemote then
-        HarvestRemote = HarvestRemote:FindFirstChild("HarvestRemote")
+    local CollectController = ReplicatedStorage:FindFirstChild("Modules")
+    if CollectController then
+        CollectController = CollectController:FindFirstChild("CollectController")
     end
     
-    if not HarvestRemote then
-        warn("HarvestRemote not found!")
+    if not CollectController then
+        warn("CollectController not found!")
         return false
     end
     
     local success = pcall(function()
-        HarvestRemote:FireServer(PlantData.Target)
+        CollectController:FireServer(PlantData.Target)
     end)
     
     return success
