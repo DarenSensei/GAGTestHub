@@ -507,18 +507,18 @@ function CoreFunctions.getCropsToHarvest()
 end
 
 function CoreFunctions.harvestPlant(PlantData)
-    local FruitCollectionController = ReplicatedStorage:FindFirstChild("Modules")
-    if FruitCollectionController then
-        FruitCollectionController = FruitCollectionController:FindFirstChild("FruitCollectionController")
+    local PickupEvent = ReplicatedStorage:FindFirstChild("GameEvents")
+    if PickupEvent then
+        PickupEvent = PickupEvent:FindFirstChild("PickupEvent")
     end
     
-    if not FruitCollectionController then
-        warn("FruitCollectionController not found!")
+    if not PickupEvent then
+        warn("PickupEvent not found!")
         return false
     end
     
     local success = pcall(function()
-        FruitCollectionController:FireServer(PlantData.Target)
+        PickupEvent:FireServer(PlantData.Target)
     end)
     
     return success
@@ -623,7 +623,6 @@ function CoreFunctions.toggleAutoHarvest(enabled)
         return true, "Auto Harvest Stopped"
     end
 end
-
 -- ==========================================
 -- SPRINKLER FUNCTIONS
 -- ==========================================
