@@ -376,6 +376,9 @@ end
 -- AUTO COLLECT
 -- ==========================================
 
+--// Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 --// Functions
 function CoreFunctions.getCurrentFarm()
     local farm = workspace:FindFirstChild("Farm")
@@ -397,9 +400,13 @@ function CoreFunctions.getCurrentFarm()
 end
 
 function CoreFunctions.canHarvest(Plant)
-    local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
-    if not Prompt or not Prompt.Enabled then return false end
-    return true
+    -- Check if plant has fruits to harvest
+    local Fruits = Plant:FindFirstChild("Fruits")
+    if not Fruits then return false end
+    
+    -- Check if there are any fruits available
+    local fruitsChildren = Fruits:GetChildren()
+    return #fruitsChildren > 0
 end
 
 function CoreFunctions.getPlantMutations(Plant)
@@ -448,15 +455,38 @@ function CoreFunctions.isTargetPlant(Plant)
     return true
 end
 
+function CoreFunctions.getHarvestTarget(Fruit)
+    -- Try to find PrimaryPart first
+    if Fruit.PrimaryPart then
+        return Fruit.PrimaryPart
+    end
+    
+    -- If no PrimaryPart, try to find Base
+    local Base = Fruit:FindFirstChild("Base")
+    if Base then
+        return Base
+    end
+    
+    -- If neither found, return nil
+    return nil
+end
+
 function CoreFunctions.collectHarvestable(Parent, Plants)
     for _, Plant in next, Parent:GetChildren() do
-        local Fruits = Plant:FindFirstChild("Fruits")
-        if Fruits then
-            CoreFunctions.collectHarvestable(Fruits, Plants)
-        end
-        
         if CoreFunctions.canHarvest(Plant) and CoreFunctions.isTargetPlant(Plant) then
-            table.insert(Plants, Plant)
+            local Fruits = Plant:FindFirstChild("Fruits")
+            if Fruits then
+                for _, Fruit in next, Fruits:GetChildren() do
+                    local target = CoreFunctions.getHarvestTarget(Fruit)
+                    if target then
+                        table.insert(Plants, {
+                            Plant = Plant,
+                            Fruit = Fruit,
+                            Target = target
+                        })
+                    end
+                end
+            end
         end
     end
     return Plants
@@ -476,13 +506,22 @@ function CoreFunctions.getCropsToHarvest()
     return CoreFunctions.collectHarvestable(PlantsPhysical, Plants)
 end
 
-function CoreFunctions.harvestPlant(Plant)
-    local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
-    if Prompt then
-        fireproximityprompt(Prompt)
-        return true
+function CoreFunctions.harvestPlant(PlantData)
+    local HarvestRemote = ReplicatedStorage:FindFirstChild("GameEvents")
+    if HarvestRemote then
+        HarvestRemote = HarvestRemote:FindFirstChild("HarvestRemote")
     end
-    return false
+    
+    if not HarvestRemote then
+        warn("HarvestRemote not found!")
+        return false
+    end
+    
+    local success = pcall(function()
+        HarvestRemote:FireServer(PlantData.Target)
+    end)
+    
+    return success
 end
 
 function CoreFunctions.autoHarvest()
@@ -494,12 +533,15 @@ function CoreFunctions.autoHarvest()
     local harvestedCount = 0
     local maxPlantsPerCycle = 50
     
-    for i, Plant in next, Plants do
+    for i, PlantData in next, Plants do
         if i > maxPlantsPerCycle then break end
         
-        if CoreFunctions.harvestPlant(Plant) then
+        if CoreFunctions.harvestPlant(PlantData) then
             harvestedCount = harvestedCount + 1
         end
+        
+        -- Small delay to prevent overwhelming the server
+        task.wait(0.1)
     end
 end
 
