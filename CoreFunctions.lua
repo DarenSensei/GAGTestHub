@@ -376,9 +376,6 @@ end
 -- AUTO COLLECT
 -- ==========================================
 
---// Services
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 --// Functions
 function CoreFunctions.getCurrentFarm()
     local farm = workspace:FindFirstChild("Farm")
@@ -507,18 +504,23 @@ function CoreFunctions.getCropsToHarvest()
 end
 
 function CoreFunctions.harvestPlant(PlantData)
-    local PickupEvent = ReplicatedStorage:FindFirstChild("GameEvents")
-    if PickupEvent then
-        PickupEvent = PickupEvent:FindFirstChild("PickupEvent")
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    
+    local HoldToCollect = LocalPlayer.PlayerGui:FindFirstChild("HoldToCollect")
+    if not HoldToCollect then
+        warn("HoldToCollect not found!")
+        return false
     end
     
-    if not PickupEvent then
-        warn("PickupEvent not found!")
+    local Collect = HoldToCollect:FindFirstChild("Collect")
+    if not Collect then
+        warn("Collect not found!")
         return false
     end
     
     local success = pcall(function()
-        PickupEvent:FireServer(PlantData.Target)
+        Collect:FireServer(PlantData.Target)
     end)
     
     return success
