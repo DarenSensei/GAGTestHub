@@ -1,6 +1,5 @@
 -- External module
 local vuln = {}
-
 -- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,7 +10,7 @@ local ZenQuestRemoteEvent = GameEvents:WaitForChild("ZenQuestRemoteEvent")
 -- Configuration
 local autoVulnEnabled = false
 local autoVulnConnection = nil
-
+local usedItems = {}
 -- Blacklisted items that should not be equipped
 local blacklistedItems = {
     "Tranquil Radar",
@@ -44,16 +43,24 @@ function vuln.findAndEquipFruit(fruitType)
                 end
             end
             
-            -- Only equip if not blacklisted
+            -- Check if item was already used
+            local itemKey = fruitType .. "_" .. item.Name
+            if usedItems[itemKey] then
+                goto continue
+            end
+            
+            -- Only equip if not blacklisted and not used
             if not isBlacklisted then
+                usedItems[itemKey] = true
                 item.Parent = player.Character
                 return true
             end
+            
+            ::continue::
         end
     end
     return false
 end
-
 function vuln.submitToFox()
     if ZenQuestRemoteEvent then
         ZenQuestRemoteEvent:FireServer("SubmitToFox")
@@ -102,6 +109,9 @@ function vuln.toggleAutoVuln(enabled)
             task.cancel(autoVulnConnection)
             autoVulnConnection = nil
         end
+        
+        -- Reset used items when starting
+        usedItems = {}
         
         autoVulnConnection = task.spawn(function()
             while autoVulnEnabled do
