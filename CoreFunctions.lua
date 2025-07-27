@@ -349,6 +349,140 @@ function CoreFunctions.toggleAutoShovel(enabled)
 end
 
 -- ==========================================
+-- AUTO COLLECT
+-- ==========================================
+
+function CoreFunctions.getCurrentFarm()
+    local farm = Workspace:FindFirstChild("Farm")
+    return farm and farm:FindFirstChild("Farm")
+end
+
+function CoreFunctions.getCropsToHarvest()
+    local farm = CoreFunctions.getCurrentFarm()
+    if not farm or not farm:FindFirstChild("Important") or not farm.Important:FindFirstChild("Plants_Physical") then
+        return {}
+    end
+    
+    local cropsToHarvest = {}
+    local selectedCount = 0
+    for _ in pairs(selectedCrops) do selectedCount = selectedCount + 1 end
+    
+    for _, plant in pairs(farm.Important.Plants_Physical:GetChildren()) do
+        if not plant or not plant.Name then continue end
+        
+        local shouldProcess = selectedCount == 0 or selectedCrops[plant.Name]
+        
+        if shouldProcess and plant:FindFirstChild("Fruits") then
+            for _, fruit in pairs(plant.Fruits:GetChildren()) do
+                if fruit.Name == "Base" and fruit.Parent == plant then continue end
+                if fruit:FindFirstChild("LockBillboardGui") then continue end
+                
+                local fruitPrimaryPart = fruit.PrimaryPart
+                local fruitBase = fruit:FindFirstChild("Base")
+                local fruitPrimaryPartChild = fruit:FindFirstChild("PrimaryPart")
+                
+                if fruitPrimaryPart or fruitBase or fruitPrimaryPartChild then
+                    table.insert(cropsToHarvest, {
+                        fruit = fruit,
+                        cropType = plant.Name,
+                        plant = plant
+                    })
+                end
+            end
+        end
+    end
+    
+    return cropsToHarvest
+end
+
+function CoreFunctions.harvestCrop(cropData)
+    if not cropData.fruit or not cropData.fruit.Parent then return false end
+    
+    local HarvestRemote = game:GetService("ReplicatedStorage").GameEvents.HarvestRemote
+    if not HarvestRemote then return false end
+    
+    local success = false
+    pcall(function()
+        HarvestRemote:FireServer(cropData.fruit)
+        success = true
+        task.wait(0.05)
+    end)
+    
+    return success
+end
+
+function CoreFunctions.autoHarvest()
+    if not autoHarvestEnabled then return end
+    
+    local cropsToHarvest = CoreFunctions.getCropsToHarvest()
+    if #cropsToHarvest == 0 then return end
+    
+    local harvestedCount = 0
+    local maxCropsPerCycle = 5
+    local processed = 0
+    
+    for _, cropData in pairs(cropsToHarvest) do
+        if processed >= maxCropsPerCycle then break end
+        
+        local harvested = CoreFunctions.harvestCrop(cropData)
+        if harvested then
+            harvestedCount = harvestedCount + 1
+            processed = processed + 1
+        end
+        
+        task.wait(0.1)
+    end
+end
+
+function CoreFunctions.getCropTypes()
+    local farm = CoreFunctions.getCurrentFarm()
+    if not farm or not farm:FindFirstChild("Important") or not farm.Important:FindFirstChild("Plants_Physical") then
+        return {"All Plants"}
+    end
+    
+    local cropTypes = {"All Plants"}
+    local addedTypes = {}
+    
+    for _, plant in pairs(farm.Important.Plants_Physical:GetChildren()) do
+        if not addedTypes[plant.Name] then
+            table.insert(cropTypes, plant.Name)
+            addedTypes[plant.Name] = true
+        end
+    end
+    
+    return cropTypes
+end
+
+function CoreFunctions.toggleAutoHarvest(enabled)
+    autoHarvestEnabled = enabled
+    
+    if enabled then
+        local HarvestRemote = game:GetService("ReplicatedStorage").GameEvents.HarvestRemote
+        if not HarvestRemote then
+            return false, "HarvestRemote event not found!"
+        end
+        
+        if autoHarvestConnection then autoHarvestConnection:Disconnect() end
+        
+        autoHarvestConnection = RunService.Heartbeat:Connect(function()
+            while autoHarvestEnabled do
+                CoreFunctions.autoHarvest()
+                task.wait(3)
+            end
+        end)
+        
+        return true, "Auto Harvest Started"
+    else
+        if autoHarvestConnection then
+            autoHarvestConnection:Disconnect()
+            autoHarvestConnection = nil
+        end
+        
+        return true, "Auto Harvest Stopped"
+    end
+end
+
+-- ==========================================
 -- SPRINKLER FUNCTIONS
 -- ==========================================
 
@@ -382,51 +516,6 @@ function CoreFunctions.deleteSprinklers(sprinklerArray, OrionLib)
         return
     end
 
-    -- Get player's root part for distance calculation
-    local player = game.Players.LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
-    local rootPart = character:WaitForChild("HumanoidRootPart")
-
-    -- Find the nearest farm (current player's farm)
-    local currentFarm = nil
-    local closestDistance = math.huge
-    
-    -- Assuming farmFolder exists and contains the farms
-    if not farmFolder then
-        if OrionLib then
-            OrionLib:MakeNotification({
-                Name = "Error",
-                Content = "Farm folder not found.",
-                Time = 3
-            })
-        end
-        return
-    end
-
-    for _, farm in ipairs(farmFolder:GetChildren()) do
-        if farm:IsA("Model") or farm:IsA("Folder") then
-            local farmRoot = farm:FindFirstChild("HumanoidRootPart") or farm:FindFirstChildWhichIsA("BasePart")
-            if farmRoot then
-                local distance = (farmRoot.Position - rootPart.Position).Magnitude
-                if distance < closestDistance then
-                    closestDistance = distance
-                    currentFarm = farm
-                end
-            end
-        end
-    end
-
-    if not currentFarm then
-        if OrionLib then
-            OrionLib:MakeNotification({
-                Name = "Error",
-                Content = "No nearby farm found.",
-                Time = 3
-            })
-        end
-        return
-    end
-
     local success, destroyEnv = pcall(function()
         return getsenv and getsenv(shovelClient) or nil
     end)
@@ -445,10 +534,7 @@ function CoreFunctions.deleteSprinklers(sprinklerArray, OrionLib)
     local deletedCount = 0
     local deletedTypes = {}
 
-    -- Only iterate through objects in the current (nearest) farm
-    local currentFarmObjects = currentFarm:FindFirstChild("Objects") or currentFarm
-    
-    for _, obj in ipairs(currentFarmObjects:GetChildren()) do
+    for _, obj in ipairs(objectsFolder:GetChildren()) do
         for _, typeName in ipairs(targetSprinklers) do
             if obj.Name == typeName then
                 -- Track which types we actually deleted
@@ -457,10 +543,16 @@ function CoreFunctions.deleteSprinklers(sprinklerArray, OrionLib)
                 end
                 deletedTypes[typeName] = deletedTypes[typeName] + 1
                 
-                -- Use shovel's Remove_Item function
+                -- Destroy the object safely
                 pcall(function()
-                    if destroyEnv and destroyEnv.Remove_Item and typeof(destroyEnv.Remove_Item) == "function" then
-                        destroyEnv.Remove_Item(obj)
+                    if destroyEnv and destroyEnv.Destroy and typeof(destroyEnv.Destroy) == "function" then
+                        destroyEnv.Destroy(obj)
+                    end
+                    if DeleteObject then
+                        DeleteObject:FireServer(obj)
+                    end
+                    if RemoveItem then
+                        RemoveItem:FireServer(obj)
                     end
                 end)
                 deletedCount = deletedCount + 1
@@ -471,13 +563,13 @@ function CoreFunctions.deleteSprinklers(sprinklerArray, OrionLib)
     if OrionLib then
         OrionLib:MakeNotification({
             Name = "Sprinklers Deleted",
-            Content = string.format("Deleted %d sprinklers from nearest farm", deletedCount),
+            Content = string.format("Deleted %d sprinklers", deletedCount),
             Time = 3
         })
     end
 end
 
--- Sprinkler selection helper functions remain the same
+-- Sprinkler selection helper functions
 function CoreFunctions.getSprinklerTypes()
     return sprinklerTypes
 end
