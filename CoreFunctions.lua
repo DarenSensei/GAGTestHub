@@ -51,6 +51,30 @@ local merchantItems = {
     "Mutation Spray Wet"
 }
 
+local LocalPlayer = Players.LocalPlayer
+local Farms = workspace.Farm
+
+--// Mutation Data
+local Mutations = {
+    Amber = 10, AncientAmber = 50, Aurora = 90, Bloodlit = 5, Burnt = 4,
+    Celestial = 120, Ceramic = 30, Chakra = 15, Chilled = 2, Choc = 2,
+    Clay = 5, Cloudtouched = 5, Cooked = 10, Dawnbound = 150, Disco = 125,
+    Drenched = 5, Eclipsed = 15, Enlightened = 35, FoxfireChakra = 90,
+    Friendbound = 70, Frozen = 10, Galactic = 120, Gold = 20, Heavenly = 5,
+    HoneyGlazed = 5, Infected = 75, Molten = 25, Moonlit = 2, Meteoric = 125,
+    OldAmber = 20, Paradisal = 100, Plasma = 5, Pollinated = 3, Radioactive = 80,
+    Rainbow = 50, Sandy = 3, Shocked = 100, Sundried = 85, Tempestuous = 19,
+    Toxic = 12, Tranquil = 20, Twisted = 5, Verdant = 5, Voidtouched = 135,
+    Wet = 2, Windstruck = 2, Wiltproof = 4, Zombified = 25
+}
+
+--// Configuration
+local selectedCrops = {}
+local whitelistMutations = {}
+local blacklistMutations = {}
+local autoHarvestEnabled = false
+local autoHarvestConnection = nil
+
 -- Pet Control Variables
 local selectedPets = {}
 local excludedPets = {}
@@ -352,98 +376,169 @@ end
 -- AUTO COLLECT
 -- ==========================================
 
-function CoreFunctions.getCurrentFarm()
-    local farm = Workspace:FindFirstChild("Farm")
-    return farm and farm:FindFirstChild("Farm")
-end
+--// Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
-function CoreFunctions.getCropsToHarvest()
-    local farm = CoreFunctions.getCurrentFarm()
-    if not farm or not farm:FindFirstChild("Important") or not farm.Important:FindFirstChild("Plants_Physical") then
-        return {}
-    end
-    
-    local cropsToHarvest = {}
-    local selectedCount = 0
-    for _ in pairs(selectedCrops) do selectedCount = selectedCount + 1 end
-    
-    for _, plant in pairs(farm.Important.Plants_Physical:GetChildren()) do
-        if not plant or not plant.Name then continue end
-        
-        local shouldProcess = selectedCount == 0 or selectedCrops[plant.Name]
-        
-        if shouldProcess and plant:FindFirstChild("Fruits") then
-            for _, fruit in pairs(plant.Fruits:GetChildren()) do
-                if fruit.Name == "Base" and fruit.Parent == plant then continue end
-                if fruit:FindFirstChild("LockBillboardGui") then continue end
-                
-                local fruitPrimaryPart = fruit.PrimaryPart
-                local fruitBase = fruit:FindFirstChild("Base")
-                local fruitPrimaryPartChild = fruit:FindFirstChild("PrimaryPart")
-                
-                if fruitPrimaryPart or fruitBase or fruitPrimaryPartChild then
-                    table.insert(cropsToHarvest, {
-                        fruit = fruit,
-                        cropType = plant.Name,
-                        plant = plant
-                    })
+local LocalPlayer = Players.LocalPlayer
+local Farms = workspace.Farm
+
+--// Mutation Data
+local Mutations = {
+    Amber = 10, AncientAmber = 50, Aurora = 90, Bloodlit = 5, Burnt = 4,
+    Celestial = 120, Ceramic = 30, Chakra = 15, Chilled = 2, Choc = 2,
+    Clay = 5, Cloudtouched = 5, Cooked = 10, Dawnbound = 150, Disco = 125,
+    Drenched = 5, Eclipsed = 15, Enlightened = 35, FoxfireChakra = 90,
+    Friendbound = 70, Frozen = 10, Galactic = 120, Gold = 20, Heavenly = 5,
+    HoneyGlazed = 5, Infected = 75, Molten = 25, Moonlit = 2, Meteoric = 125,
+    OldAmber = 20, Paradisal = 100, Plasma = 5, Pollinated = 3, Radioactive = 80,
+    Rainbow = 50, Sandy = 3, Shocked = 100, Sundried = 85, Tempestuous = 19,
+    Toxic = 12, Tranquil = 20, Twisted = 5, Verdant = 5, Voidtouched = 135,
+    Wet = 2, Windstruck = 2, Wiltproof = 4, Zombified = 25
+}
+
+--// Configuration
+local selectedCrops = {}
+local whitelistMutations = {}
+local blacklistMutations = {}
+local autoHarvestEnabled = false
+local autoHarvestConnection = nil
+
+--// Functions
+function CoreFunctions.getCurrentFarm()
+    for _, Farm in next, Farms:GetChildren() do
+        local Important = Farm:FindFirstChild("Important")
+        if Important then
+            local Data = Important:FindFirstChild("Data")
+            if Data then
+                local Owner = Data:FindFirstChild("Owner")
+                if Owner and Owner.Value == LocalPlayer.Name then
+                    return Farm
                 end
             end
         end
     end
-    
-    return cropsToHarvest
+    return nil
 end
 
-function CoreFunctions.harvestCrop(cropData)
-    if not cropData.fruit or not cropData.fruit.Parent then return false end
+function CoreFunctions.canHarvest(Plant)
+    local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
+    if not Prompt or not Prompt.Enabled then return false end
+    return true
+end
+
+function CoreFunctions.getPlantMutations(Plant)
+    local mutationList = {}
+    for mutation, _ in pairs(Mutations) do
+        if Plant:GetAttribute(mutation) == true then
+            table.insert(mutationList, mutation)
+        end
+    end
+    return mutationList
+end
+
+function CoreFunctions.isTargetPlant(Plant)
+    local selectedCount = 0
+    for _ in pairs(selectedCrops) do selectedCount = selectedCount + 1 end
     
-    local HarvestRemote = game:GetService("ReplicatedStorage").GameEvents.HarvestRemote
-    if not HarvestRemote then return false end
+    -- Check if plant matches selected crops
+    local shouldProcess = selectedCount == 0 or selectedCrops[Plant.Name]
+    if not shouldProcess then return false end
     
-    local success = false
-    pcall(function()
-        HarvestRemote:FireServer(cropData.fruit)
-        success = true
-        task.wait(0.05)
-    end)
+    -- Check mutations
+    local mutations = CoreFunctions.getPlantMutations(Plant)
     
-    return success
+    -- Check whitelist (if specified)
+    local whitelistCount = 0
+    for _ in pairs(whitelistMutations) do whitelistCount = whitelistCount + 1 end
+    
+    if whitelistCount > 0 then
+        local hasWhitelistMutation = false
+        for _, mutation in ipairs(mutations) do
+            if whitelistMutations[mutation] then
+                hasWhitelistMutation = true
+                break
+            end
+        end
+        if not hasWhitelistMutation then return false end
+    end
+    
+    -- Check blacklist
+    for _, mutation in ipairs(mutations) do
+        if blacklistMutations[mutation] then
+            return false
+        end
+    end
+    
+    return true
+end
+
+function CoreFunctions.collectHarvestable(Parent, Plants)
+    for _, Plant in next, Parent:GetChildren() do
+        local Fruits = Plant:FindFirstChild("Fruits")
+        if Fruits then
+            CoreFunctions.collectHarvestable(Fruits, Plants)
+        end
+        
+        if CoreFunctions.canHarvest(Plant) and CoreFunctions.isTargetPlant(Plant) then
+            table.insert(Plants, Plant)
+        end
+    end
+    return Plants
+end
+
+function CoreFunctions.getCropsToHarvest()
+    local Plants = {}
+    local MyFarm = CoreFunctions.getCurrentFarm()
+    if not MyFarm then return Plants end
+    
+    local Important = MyFarm:FindFirstChild("Important")
+    if not Important then return Plants end
+    
+    local PlantsPhysical = Important:FindFirstChild("Plants_Physical")
+    if not PlantsPhysical then return Plants end
+    
+    return CoreFunctions.collectHarvestable(PlantsPhysical, Plants)
+end
+
+function CoreFunctions.harvestPlant(Plant)
+    local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
+    if Prompt then
+        fireproximityprompt(Prompt)
+        return true
+    end
+    return false
 end
 
 function CoreFunctions.autoHarvest()
     if not autoHarvestEnabled then return end
     
-    local cropsToHarvest = CoreFunctions.getCropsToHarvest()
-    if #cropsToHarvest == 0 then return end
-    
+    local Plants = CoreFunctions.getCropsToHarvest()
     local harvestedCount = 0
-    local maxCropsPerCycle = 5
-    local processed = 0
     
-    for _, cropData in pairs(cropsToHarvest) do
-        if processed >= maxCropsPerCycle then break end
-        
-        local harvested = CoreFunctions.harvestCrop(cropData)
-        if harvested then
+    for _, Plant in next, Plants do
+        if CoreFunctions.harvestPlant(Plant) then
             harvestedCount = harvestedCount + 1
-            processed = processed + 1
         end
-        
-        task.wait(0.1)
+        task.wait(0.01)
     end
 end
 
 function CoreFunctions.getCropTypes()
-    local farm = CoreFunctions.getCurrentFarm()
-    if not farm or not farm:FindFirstChild("Important") or not farm.Important:FindFirstChild("Plants_Physical") then
-        return {"All Plants"}
-    end
+    local MyFarm = CoreFunctions.getCurrentFarm()
+    if not MyFarm then return {"All Plants"} end
+    
+    local Important = MyFarm:FindFirstChild("Important")
+    if not Important then return {"All Plants"} end
+    
+    local PlantsPhysical = Important:FindFirstChild("Plants_Physical")
+    if not PlantsPhysical then return {"All Plants"} end
     
     local cropTypes = {"All Plants"}
     local addedTypes = {}
     
-    for _, plant in pairs(farm.Important.Plants_Physical:GetChildren()) do
+    for _, plant in pairs(PlantsPhysical:GetChildren()) do
         if not addedTypes[plant.Name] then
             table.insert(cropTypes, plant.Name)
             addedTypes[plant.Name] = true
@@ -453,15 +548,35 @@ function CoreFunctions.getCropTypes()
     return cropTypes
 end
 
+function CoreFunctions.getMutationTypes()
+    local mutationList = {}
+    for mutation, _ in pairs(Mutations) do
+        table.insert(mutationList, mutation)
+    end
+    table.sort(mutationList)
+    return mutationList
+end
+
+function CoreFunctions.setSelectedCrops(crops)
+    selectedCrops = crops or {}
+end
+
+function CoreFunctions.setWhitelistMutations(mutations)
+    whitelistMutations = mutations or {}
+end
+
+function CoreFunctions.setBlacklistMutations(mutations)
+    blacklistMutations = mutations or {}
+end
+
+function CoreFunctions.getAutoHarvestStatus()
+    return autoHarvestEnabled
+end
+
 function CoreFunctions.toggleAutoHarvest(enabled)
     autoHarvestEnabled = enabled
     
     if enabled then
-        local HarvestRemote = game:GetService("ReplicatedStorage").GameEvents.HarvestRemote
-        if not HarvestRemote then
-            return false, "HarvestRemote event not found!"
-        end
-        
         if autoHarvestConnection then autoHarvestConnection:Disconnect() end
         
         autoHarvestConnection = RunService.Heartbeat:Connect(function()
