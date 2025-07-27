@@ -58,7 +58,7 @@ local Farms = workspace.Farm
 local Mutations = {
     Amber = 10, AncientAmber = 50, Aurora = 90, Bloodlit = 5, Burnt = 4,
     Celestial = 120, Ceramic = 30, Chakra = 15, Chilled = 2, Choc = 2,
-    Clay = 5, Cloudtouched = 5, Cooked = 10, Dawnbound = 150, Disco = 125,
+    Clay = 5, Cloudtouched = 5, Cooked = 10, Corrupt = 20, Dawnbound = 150, Disco = 125,
     Drenched = 5, Eclipsed = 15, Enlightened = 35, FoxfireChakra = 90,
     Friendbound = 70, Frozen = 10, Galactic = 120, Gold = 20, Heavenly = 5,
     HoneyGlazed = 5, Infected = 75, Molten = 25, Moonlit = 2, Meteoric = 125,
