@@ -32,7 +32,7 @@ function vuln.findAndEquipFruit(fruitType)
     if not backpack then return false end
     
     for _, item in pairs(backpack:GetChildren()) do
-        if item:IsA("Tool") and string.find(item.Name, fruitType) then
+        if item:IsA("Tool") and string.find(item.Name, fruitType) and string.find(item.Name, "%[.+kg%]") then
             -- Check if item is blacklisted
             local isBlacklisted = false
             for _, blacklistedName in pairs(blacklistedItems) do
