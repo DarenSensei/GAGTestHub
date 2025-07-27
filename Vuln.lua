@@ -12,7 +12,6 @@ local ZenQuestRemoteEvent = GameEvents:WaitForChild("ZenQuestRemoteEvent")
 local autoVulnEnabled = false
 local autoVulnConnection = nil
 
--- Blacklisted items that should not be equipped
 local blacklistedItems = {
     "Tranquil Radar",
     "Corrupt Radar", 
@@ -27,7 +26,7 @@ local blacklistedItems = {
     "Tranquil Staff",
     "Corrupted Kodama"
 }
-
+-- update check
 -- Functions
 function vuln.findAndEquipFruit(fruitType)
     if not player.Character then return false end
@@ -36,29 +35,19 @@ function vuln.findAndEquipFruit(fruitType)
     
     for _, item in pairs(backpack:GetChildren()) do
         if item:IsA("Tool") and string.find(item.Name, fruitType) then
-            -- Check if item is blacklisted
-            local isBlacklisted = false
-            for _, blacklistedName in pairs(blacklistedItems) do
-                if item.Name == blacklistedName then
-                    isBlacklisted = true
-                    break
-                end
-            end
-            
-            -- Only equip if not blacklisted
-            if not isBlacklisted then
-                item.Parent = player.Character
-                return true
-            end
+            item.Parent = player.Character
+            return true
         end
     end
     return false
 end
+
 function vuln.submitToFox()
     if ZenQuestRemoteEvent then
         ZenQuestRemoteEvent:FireServer("SubmitToFox")
     end
 end
+
 function vuln.returnItemToBackpack()
     if not player.Character then return end
     local backpack = player:FindFirstChild("Backpack")
@@ -70,6 +59,7 @@ function vuln.returnItemToBackpack()
         end
     end
 end
+
 function vuln.autoVulnSubmission()
     if not autoVulnEnabled then return end
     
@@ -91,9 +81,11 @@ function vuln.autoVulnSubmission()
         task.wait(0.5)
     end
 end
+
 function vuln.getAutoVulnStatus()
     return autoVulnEnabled
 end
+
 function vuln.toggleAutoVuln(enabled)
     autoVulnEnabled = enabled
     
@@ -121,4 +113,5 @@ function vuln.toggleAutoVuln(enabled)
         return true, "Auto Vuln Submission Stopped"
     end
 end
+
 return vuln
