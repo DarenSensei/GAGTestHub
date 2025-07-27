@@ -1432,7 +1432,6 @@ MiscTab:Section({
     Title = "--ESP--"
 })
 
-
 MiscTab:Divider()
 
 MiscTab:Dropdown({
@@ -1464,6 +1463,35 @@ MiscTab:Dropdown({
     end
 })
 
+MiscTab:Button({
+    Title = "Refresh Crop List",
+    Icon = "rotate-cw",
+    Callback = function()
+        local function safeCall(func, funcName)
+            local success, result = pcall(func)
+            if success then
+                return result
+            else
+                return nil
+            end
+        end
+        
+        local newCropTypes = safeCall(esp.getCropTypes, "getCropTypes") or {"All Plants"}
+        
+        if cropDropdown and cropDropdown.Refresh then
+            pcall(function()
+                cropDropdown:Refresh(newCropTypes, true)
+            end)
+        end
+        
+        WindUI:Notify({
+            Title = "List Refreshed",
+            Content = string.format("Found %d crop types", #newCropTypes - 1),
+            Duration = 2,
+            Icon = "refresh-cw"
+        })
+    end
+})
 
 MiscTab:Toggle({
     Title = "Fruit ESP",
@@ -1472,6 +1500,14 @@ MiscTab:Toggle({
         esp.toggle(Value)
     end
 })
+
+MiscTab:Section({
+    Title = "--Pet Cooldown ESP--"
+})
+
+MiscTab:Divider()
+
+
 
 -- ===========================================
 -- SOCIAL TAB (Updated for WindUI)
