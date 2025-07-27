@@ -423,14 +423,7 @@ function CoreFunctions.isTargetPlant(Plant)
     -- Check mutations
     local mutations = CoreFunctions.getPlantMutations(Plant)
     
-    -- Check blacklist first
-    for _, mutation in ipairs(mutations) do
-        if blacklistMutations[mutation] then
-            return false
-        end
-    end
-    
-    -- Check whitelist (only if specified)
+    -- Check whitelist (if specified)
     local whitelistCount = 0
     for _ in pairs(whitelistMutations) do whitelistCount = whitelistCount + 1 end
     
@@ -443,6 +436,13 @@ function CoreFunctions.isTargetPlant(Plant)
             end
         end
         if not hasWhitelistMutation then return false end
+    end
+    
+    -- Check blacklist
+    for _, mutation in ipairs(mutations) do
+        if blacklistMutations[mutation] then
+            return false
+        end
     end
     
     return true
@@ -480,10 +480,9 @@ function CoreFunctions.harvestPlant(Plant)
     local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
     if Prompt then
         fireproximityprompt(Prompt)
+        return true
     end
-    game:GetService("ReplicatedStorage").GameEvents.PickupEvent:FireServer()
-    game:GetService("ReplicatedStorage").GameEvents.HarvestRemote:InvokeServer()
-    return true
+    return false
 end
 
 function CoreFunctions.autoHarvest()
