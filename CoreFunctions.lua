@@ -480,6 +480,7 @@ function CoreFunctions.harvestPlant(Plant)
     local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
     if Prompt then
         fireproximityprompt(Prompt)
+        game:GetService("ReplicatedStorage").GameEvents.PickupEvent:FireServer()
         return true
     end
     return false
