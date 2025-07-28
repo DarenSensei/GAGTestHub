@@ -102,6 +102,10 @@ local currentPetsList = {}
 local petDropdown = nil
 local cropDropdown = nil
 local blackScreenGui = nil
+local autoSellEnabled = false
+local sellDelay = 1
+local isProcessing = false
+local autoSellConnection
 
 -- Sprinkler variables
 local sprinklerTypes = {"Basic Sprinkler", "Advanced Sprinkler", "Master Sprinkler", "Godly Sprinkler", "Honey Sprinkler", "Chocolate Sprinkler"}
@@ -394,6 +398,93 @@ local Farm = Window:Tab({
     Icon = "tractor", -- Using WindUI's lucide icon system
 })
 
+Farm:Divider()
+
+Farm:Section({
+    Title = "--AUTO SHOVEL--"
+})
+
+cropDropdown = Farm:Dropdown({
+    Title = "Select Crops to Monitor",
+    Values = safeCall(CoreFunctions.getCropTypes, "getCropTypes") or {"All Plants"},
+    Value = {""},
+    Multi = true,
+    AllowNone = true,
+    Callback = function(selectedValues)
+        local selectedCrops = {}
+        
+        if selectedValues and #selectedValues > 0 then
+            local hasAllPlants = false
+            for _, value in pairs(selectedValues) do
+                if value == "All Plants" then
+                    hasAllPlants = true
+                    break
+                end
+            end
+            
+            if not hasAllPlants then
+                for _, cropName in pairs(selectedValues) do
+                    selectedCrops[cropName] = true
+                end
+            end
+        end
+        
+        safeCall(CoreFunctions.setSelectedCrops, "setSelectedCrops", selectedCrops)
+    end
+})
+
+Farm:Button({
+    Title = "Refresh Crop List",
+    Icon = "rotate-cw",
+    Callback = function()
+        local newCropTypes = safeCall(CoreFunctions.getCropTypes, "getCropTypes") or {"All Plants"}
+        if cropDropdown and cropDropdown.Refresh then
+            pcall(function()
+                cropDropdown:Refresh(newCropTypes, true)
+            end)
+        end
+        
+        WindUI:Notify({
+            Title = "List Refreshed",
+            Content = string.format("Found %d crop types", #newCropTypes - 1),
+            Duration = 2,
+            Icon = "refresh-cw"
+        })
+    end
+})
+
+Farm:Input({
+    Title = "Remove Fruits Below (kg)",
+    Value = tostring(safeCall(CoreFunctions.getTargetFruitWeight, "getTargetFruitWeight") or 50),
+    Placeholder = "Enter weight threshold",
+    InputIcon = "weight",
+    Callback = function(value)
+        local weight = tonumber(value)
+        if weight and weight > 0 then
+            local success = safeCall(CoreFunctions.setTargetFruitWeight, "setTargetFruitWeight", weight)
+        end
+    end
+})
+
+Farm:Toggle({
+    Title = "Enable Auto Shovel",
+    Value = safeCall(CoreFunctions.getAutoShovelStatus, "getAutoShovelStatus") or false,
+    Icon = "shovel",
+    Callback = function(enabled)
+        local success, message = safeCall(CoreFunctions.toggleAutoShovel, "toggleAutoShovel", enabled)
+        if success and message then
+            WindUI:Notify({
+                Title = "Auto Shovel",
+                Content = message,
+                Duration = 2,
+                Icon = enabled and "check-circle" or "x-circle"
+            })
+        end
+    end
+})
+
+Farm:Divider()
+
 Farm:Section({
     Title = "-- Auto harvest --"
 })
@@ -519,84 +610,53 @@ Farm:Toggle({
 Farm:Divider()
 
 Farm:Section({
-    Title = "--AUTO SHOVEL--"
+    Title = "-- Auto Sell --"
 })
 
-cropDropdown = Farm:Dropdown({
-    Title = "Select Crops to Monitor",
-    Values = safeCall(CoreFunctions.getCropTypes, "getCropTypes") or {"All Plants"},
-    Value = {""},
-    Multi = true,
-    AllowNone = true,
-    Callback = function(selectedValues)
-        local selectedCrops = {}
-        
-        if selectedValues and #selectedValues > 0 then
-            local hasAllPlants = false
-            for _, value in pairs(selectedValues) do
-                if value == "All Plants" then
-                    hasAllPlants = true
-                    break
-                end
-            end
-            
-            if not hasAllPlants then
-                for _, cropName in pairs(selectedValues) do
-                    selectedCrops[cropName] = true
-                end
+-- Main loop function
+local function startAutoSell()
+    if autoSellConnection then
+        autoSellConnection:Disconnect()
+    end
+    
+    spawn(function()
+        while autoSellEnabled do
+            if not isProcessing then
+                isProcessing = true
+                CoreFunctions.performAutoSell()
+                isProcessing = false
+                wait(sellDelay)
+            else
+                wait(0.1)
             end
         end
-        
-        safeCall(CoreFunctions.setSelectedCrops, "setSelectedCrops", selectedCrops)
-    end
-})
+    end)
+end
 
-Farm:Button({
-    Title = "Refresh Crop List",
-    Icon = "rotate-cw",
-    Callback = function()
-        local newCropTypes = safeCall(CoreFunctions.getCropTypes, "getCropTypes") or {"All Plants"}
-        if cropDropdown and cropDropdown.Refresh then
-            pcall(function()
-                cropDropdown:Refresh(newCropTypes, true)
-            end)
-        end
-        
-        WindUI:Notify({
-            Title = "List Refreshed",
-            Content = string.format("Found %d crop types", #newCropTypes - 1),
-            Duration = 2,
-            Icon = "refresh-cw"
-        })
-    end
-})
-
-Farm:Input({
-    Title = "Remove Fruits Below (kg)",
-    Value = tostring(safeCall(CoreFunctions.getTargetFruitWeight, "getTargetFruitWeight") or 50),
-    Placeholder = "Enter weight threshold",
-    InputIcon = "weight",
-    Callback = function(value)
-        local weight = tonumber(value)
-        if weight and weight > 0 then
-            local success = safeCall(CoreFunctions.setTargetFruitWeight, "setTargetFruitWeight", weight)
-        end
-    end
-})
-
+-- Toggle for Auto Sell
 Farm:Toggle({
-    Title = "Enable Auto Shovel",
-    Value = safeCall(CoreFunctions.getAutoShovelStatus, "getAutoShovelStatus") or false,
-    Icon = "shovel",
-    Callback = function(enabled)
-        local success, message = safeCall(CoreFunctions.toggleAutoShovel, "toggleAutoShovel", enabled)
-        if success and message then
-            WindUI:Notify({
-                Title = "Auto Shovel",
-                Content = message,
-                Duration = 2,
-                Icon = enabled and "check-circle" or "x-circle"
-            })
+    Title = "Auto Sell",
+    Value = false,
+    Callback = function(Value)
+        autoSellEnabled = Value
+        
+        if Value then
+            startAutoSell()
+        else
+            autoSellEnabled = false
+        end
+    end
+})
+
+-- Input for Delay
+Farm:Input({
+    Title = "Sell Delay",
+    Desc = "Delay between sells (seconds)",
+    Placeholder = "Enter delay in seconds...",
+    Callback = function(value)
+        local delay = tonumber(value)
+        if delay and delay >= 0.1 then
+            sellDelay = delay
         end
     end
 })
