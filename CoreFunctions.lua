@@ -950,7 +950,7 @@ function CoreFunctions.performAutoSell()
     CoreFunctions.teleportTo(targetPosition)
     
     -- Wait a brief moment for teleport to complete
-    wait(0.1)
+    wait(0.3)
     
     -- Fire sell event
     Sell_Inventory:FireServer()
