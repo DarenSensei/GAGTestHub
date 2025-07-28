@@ -14,8 +14,10 @@ local ZenQuestRemoteEvent = GameEvents:WaitForChild("ZenQuestRemoteEvent")
 -- Configuration
 local autoVulnEnabled = false
 local autoVulnConnection = nil
-local teleportDelay = 5 -- Default delay in seconds
+local farmDuration = 60 -- How long to farm at teleport position (seconds)
+local waitDuration = 30 -- How long to wait at old position (seconds)
 local storedPosition = nil
+local teleportPosition = CFrame.new(-102.564087, 2.99999976, -9.10526657) -- Default from your debug info
 
 -- Blacklisted items that should not be equipped
 local blacklistedItems = {
@@ -50,20 +52,50 @@ function vuln.teleportToStoredPosition()
     return false
 end
 
-function vuln.setTeleportDelay(seconds)
+function vuln.teleportToFarmPosition()
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart.CFrame = teleportPosition
+        return true
+    end
+    return false
+end
+
+function vuln.setFarmDuration(seconds)
     if seconds and seconds >= 0.1 then
-        teleportDelay = seconds
-        return true, "Teleport delay set to " .. seconds .. " seconds"
+        farmDuration = seconds
+        return true, "Farm duration set to " .. seconds .. " seconds"
     else
-        return false, "Invalid delay time. Must be at least 0.1 seconds"
+        return false, "Invalid farm duration. Must be at least 0.1 seconds"
     end
 end
 
-function vuln.getTeleportDelay()
-    return teleportDelay
+function vuln.setWaitDuration(seconds)
+    if seconds and seconds >= 0.1 then
+        waitDuration = seconds
+        return true, "Wait duration set to " .. seconds .. " seconds"
+    else
+        return false, "Invalid wait duration. Must be at least 0.1 seconds"
+    end
 end
 
--- Existing functions with teleportation integration
+function vuln.setTeleportPosition(x, y, z)
+    if x and y and z then
+        teleportPosition = CFrame.new(x, y, z)
+        return true, "Teleport position set to (" .. x .. ", " .. y .. ", " .. z .. ")"
+    else
+        return false, "Invalid coordinates"
+    end
+end
+
+function vuln.getFarmDuration()
+    return farmDuration
+end
+
+function vuln.getWaitDuration()
+    return waitDuration
+end
+
+-- Existing functions
 function vuln.findAndEquipFruit(fruitType)
     if not player.Character then return false end
     local backpack = player:FindFirstChild("Backpack")
@@ -108,36 +140,47 @@ function vuln.returnItemToBackpack()
     end
 end
 
--- Enhanced auto vuln submission with teleportation
+-- Enhanced auto vuln submission with teleportation and looping
 function vuln.autoVulnSubmission()
     if not autoVulnEnabled then return end
     
     -- Store current position before starting
     vuln.storeCurrentPosition()
     
-    -- Tranquil first
-    if vuln.findAndEquipFruit("Tranquil") then
-        task.wait(0.1)
-        vuln.submitToFox()
-        task.wait(0.1)
-        vuln.returnItemToBackpack()
-        task.wait(0.1)
+    -- Teleport to farm position
+    vuln.teleportToFarmPosition()
+    task.wait(0.5) -- Small delay to ensure teleport completes
+    
+    -- Farm for specified duration
+    local farmStartTime = tick()
+    while autoVulnEnabled and (tick() - farmStartTime) < farmDuration do
+        -- Tranquil first
+        if vuln.findAndEquipFruit("Tranquil") then
+            task.wait(0.1)
+            vuln.submitToFox()
+            task.wait(0.1)
+            vuln.returnItemToBackpack()
+        end
+        
+        -- Corrupt second
+        if vuln.findAndEquipFruit("Corrupt") then
+            task.wait(0.1)
+            vuln.submitToFox()
+            task.wait(0.1)
+            vuln.returnItemToBackpack()
+        end
+        
+        task.wait(0.1) -- Small delay between loops
     end
     
-    -- Corrupt second
-    if vuln.findAndEquipFruit("Corrupt") then
-        task.wait(0.1)
-        vuln.submitToFox()
-        task.wait(0.1)
-        vuln.returnItemToBackpack()
-        task.wait(0.1)
-    end
-    
-    -- Wait for specified delay then teleport back
+    -- Return to stored position
     if storedPosition then
-        task.wait(teleportDelay)
         vuln.teleportToStoredPosition()
+        task.wait(0.5) -- Small delay to ensure teleport completes
     end
+    
+    -- Wait at old position
+    task.wait(waitDuration)
 end
 
 function vuln.getAutoVulnStatus()
@@ -156,11 +199,11 @@ function vuln.toggleAutoVuln(enabled)
         autoVulnConnection = task.spawn(function()
             while autoVulnEnabled do
                 vuln.autoVulnSubmission()
-                task.wait(2)
+                -- No additional wait here since autoVulnSubmission handles timing
             end
         end)
         
-        return true, "Auto Vuln Submission Started with " .. teleportDelay .. "s teleport delay"
+        return true, "Auto Vuln Submission Started - Farm: " .. farmDuration .. "s, Wait: " .. waitDuration .. "s"
     else
         if autoVulnConnection then
             task.cancel(autoVulnConnection)
