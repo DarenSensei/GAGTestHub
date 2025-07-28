@@ -376,6 +376,9 @@ end
 -- AUTO COLLECT
 -- ==========================================
 
+--// Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 --// Functions
 function CoreFunctions.getCurrentFarm()
     local farm = workspace:FindFirstChild("Farm")
@@ -397,13 +400,9 @@ function CoreFunctions.getCurrentFarm()
 end
 
 function CoreFunctions.canHarvest(Plant)
-    -- Check if plant has fruits to harvest
-    local Fruits = Plant:FindFirstChild("Fruits")
-    if not Fruits then return false end
-    
-    -- Check if there are any fruits available
-    local fruitsChildren = Fruits:GetChildren()
-    return #fruitsChildren > 0
+    local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
+    if not Prompt or not Prompt.Enabled then return false end
+    return true
 end
 
 function CoreFunctions.getPlantMutations(Plant)
@@ -470,20 +469,13 @@ end
 
 function CoreFunctions.collectHarvestable(Parent, Plants)
     for _, Plant in next, Parent:GetChildren() do
+        local Fruits = Plant:FindFirstChild("Fruits")
+        if Fruits then
+            CoreFunctions.collectHarvestable(Fruits, Plants)
+        end
+        
         if CoreFunctions.canHarvest(Plant) and CoreFunctions.isTargetPlant(Plant) then
-            local Fruits = Plant:FindFirstChild("Fruits")
-            if Fruits then
-                for _, Fruit in next, Fruits:GetChildren() do
-                    local target = CoreFunctions.getHarvestTarget(Fruit)
-                    if target then
-                        table.insert(Plants, {
-                            Plant = Plant,
-                            Fruit = Fruit,
-                            Target = target
-                        })
-                    end
-                end
-            end
+            table.insert(Plants, Plant)
         end
     end
     return Plants
@@ -503,27 +495,13 @@ function CoreFunctions.getCropsToHarvest()
     return CoreFunctions.collectHarvestable(PlantsPhysical, Plants)
 end
 
-function CoreFunctions.harvestPlant(PlantData)
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    
-    local HoldToCollect = LocalPlayer.PlayerGui:FindFirstChild("HoldToCollect")
-    if not HoldToCollect then
-        warn("HoldToCollect not found!")
-        return false
+function CoreFunctions.harvestPlant(Plant)
+    local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
+    if Prompt then
+        fireproximityprompt(Prompt)
+        return true
     end
-    
-    local Collect = HoldToCollect:FindFirstChild("Collect")
-    if not Collect then
-        warn("Collect not found!")
-        return false
-    end
-    
-    local success = pcall(function()
-        Collect:FireServer(PlantData.Target)
-    end)
-    
-    return success
+    return false
 end
 
 function CoreFunctions.autoHarvest()
@@ -535,15 +513,12 @@ function CoreFunctions.autoHarvest()
     local harvestedCount = 0
     local maxPlantsPerCycle = 50
     
-    for i, PlantData in next, Plants do
+    for i, Plant in next, Plants do
         if i > maxPlantsPerCycle then break end
         
-        if CoreFunctions.harvestPlant(PlantData) then
+        if CoreFunctions.harvestPlant(Plant) then
             harvestedCount = harvestedCount + 1
         end
-        
-        -- Small delay to prevent overwhelming the server
-        task.wait(0.1)
     end
 end
 
