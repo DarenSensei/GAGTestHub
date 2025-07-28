@@ -376,6 +376,9 @@ end
 -- AUTO COLLECT
 -- ==========================================
 
+--// Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 --// Functions
 function CoreFunctions.getCurrentFarm()
     local farm = workspace:FindFirstChild("Farm")
@@ -495,22 +498,44 @@ end
 function CoreFunctions.harvestPlant(Plant)
     local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
     if Prompt then
-        -- Force the prompt to be available regardless of UI visibility
-        local originalMaxDistance = Prompt.MaxActivationDistance
-        local originalEnabled = Prompt.Enabled
-        local originalRequiresLineOfSight = Prompt.RequiresLineOfSight
+        local Players = game:GetService("Players")
+        local LocalPlayer = Players.LocalPlayer
+        local character = LocalPlayer.Character
         
-        Prompt.MaxActivationDistance = math.huge -- Set to infinite distance
-        Prompt.Enabled = true -- Ensure it's enabled
-        Prompt.RequiresLineOfSight = false -- Remove line of sight requirement
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            local humanoidRootPart = character.HumanoidRootPart
+            local originalPosition = humanoidRootPart.CFrame
+            
+            -- Temporarily teleport close to the plant
+            local plantPosition = Plant.PrimaryPart and Plant.PrimaryPart.CFrame or Plant:FindFirstChild("Base") and Plant.Base.CFrame
+            if plantPosition then
+                humanoidRootPart.CFrame = plantPosition + Vector3.new(0, 5, 0) -- Teleport slightly above the plant
+                
+                -- Wait a brief moment and then fire the prompt
+                task.wait(0.1)
+                
+                -- Force the prompt to be available
+                Prompt.MaxActivationDistance = math.huge
+                Prompt.Enabled = true
+                Prompt.RequiresLineOfSight = false
+                
+                fireproximityprompt(Prompt)
+                
+                -- Wait a moment for the collection to register
+                task.wait(0.1)
+                
+                -- Teleport back to original position
+                humanoidRootPart.CFrame = originalPosition
+                
+                return true
+            end
+        end
         
-        -- Fire the prompt even if UI isn't showing
+        -- Fallback: try normal method if teleport failed
+        Prompt.MaxActivationDistance = math.huge
+        Prompt.Enabled = true
+        Prompt.RequiresLineOfSight = false
         fireproximityprompt(Prompt)
-        
-        -- Restore original values
-        Prompt.MaxActivationDistance = originalMaxDistance
-        Prompt.Enabled = originalEnabled
-        Prompt.RequiresLineOfSight = originalRequiresLineOfSight
         
         return true
     end
