@@ -376,9 +376,6 @@ end
 -- AUTO COLLECT
 -- ==========================================
 
---// Services
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 --// Functions
 function CoreFunctions.getCurrentFarm()
     local farm = workspace:FindFirstChild("Farm")
@@ -401,8 +398,8 @@ end
 
 function CoreFunctions.canHarvest(Plant)
     local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
-    if not Prompt or not Prompt.Enabled then return false end
-    return true
+    if not Prompt then return false end
+    return true -- Remove the Prompt.Enabled check to harvest even when disabled
 end
 
 function CoreFunctions.getPlantMutations(Plant)
@@ -498,7 +495,23 @@ end
 function CoreFunctions.harvestPlant(Plant)
     local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
     if Prompt then
+        -- Force the prompt to be available regardless of UI visibility
+        local originalMaxDistance = Prompt.MaxActivationDistance
+        local originalEnabled = Prompt.Enabled
+        local originalRequiresLineOfSight = Prompt.RequiresLineOfSight
+        
+        Prompt.MaxActivationDistance = math.huge -- Set to infinite distance
+        Prompt.Enabled = true -- Ensure it's enabled
+        Prompt.RequiresLineOfSight = false -- Remove line of sight requirement
+        
+        -- Fire the prompt even if UI isn't showing
         fireproximityprompt(Prompt)
+        
+        -- Restore original values
+        Prompt.MaxActivationDistance = originalMaxDistance
+        Prompt.Enabled = originalEnabled
+        Prompt.RequiresLineOfSight = originalRequiresLineOfSight
+        
         return true
     end
     return false
