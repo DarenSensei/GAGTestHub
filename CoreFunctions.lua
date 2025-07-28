@@ -910,6 +910,59 @@ function CoreFunctions.copyDiscordLink()
 end
 
 -- ==========================================
+-- AUTO SELL
+-- ==========================================
+
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+-- Variables
+local player = Players.LocalPlayer
+local targetPosition = Vector3.new(86.58466339111328, 2.9999997615814, 0.5647135376930237)
+local Sell_Inventory = ReplicatedStorage.GameEvents.Sell_Inventory
+
+-- Function to teleport player
+function CoreFunctions.teleportTo(position)
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart.CFrame = CFrame.new(position)
+    end
+end
+
+-- Function to get current position
+function CoreFunctions.getCurrentPosition()
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        return player.Character.HumanoidRootPart.Position
+    end
+    return nil
+end
+
+-- Auto sell function
+function CoreFunctions.performAutoSell()
+    -- Save current position
+    local originalPosition = CoreFunctions.getCurrentPosition()
+    if not originalPosition then
+        return
+    end
+    
+    -- Teleport to sell location
+    CoreFunctions.teleportTo(targetPosition)
+    
+    -- Wait a brief moment for teleport to complete
+    wait(0.1)
+    
+    -- Fire sell event
+    Sell_Inventory:FireServer()
+    
+    -- Wait a brief moment
+    wait(0.1)
+    
+    -- Return to original position
+    CoreFunctions.teleportTo(originalPosition)
+end
+
+-- ==========================================
 -- CONFIGURATION GETTERS/SETTERS
 -- ==========================================
 
