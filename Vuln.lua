@@ -1,15 +1,22 @@
 -- External module
 local vuln = {}
+
 -- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
+
 -- Wait for ReplicatedStorage to load GameEvents
 local GameEvents = ReplicatedStorage:WaitForChild("GameEvents")
 local ZenQuestRemoteEvent = GameEvents:WaitForChild("ZenQuestRemoteEvent")
+
 -- Configuration
 local autoVulnEnabled = false
 local autoVulnConnection = nil
+local teleportDelay = 5 -- Default delay in seconds
+local storedPosition = nil
+
 -- Blacklisted items that should not be equipped
 local blacklistedItems = {
     "Tranquil Radar",
@@ -25,7 +32,38 @@ local blacklistedItems = {
     "Tranquil Staff",
     "Corrupted Kodama"
 }
--- update check
+
+-- Position storage and teleportation functions
+function vuln.storeCurrentPosition()
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        storedPosition = player.Character.HumanoidRootPart.CFrame
+        return true
+    end
+    return false
+end
+
+function vuln.teleportToStoredPosition()
+    if storedPosition and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart.CFrame = storedPosition
+        return true
+    end
+    return false
+end
+
+function vuln.setTeleportDelay(seconds)
+    if seconds and seconds >= 0.1 then
+        teleportDelay = seconds
+        return true, "Teleport delay set to " .. seconds .. " seconds"
+    else
+        return false, "Invalid delay time. Must be at least 0.1 seconds"
+    end
+end
+
+function vuln.getTeleportDelay()
+    return teleportDelay
+end
+
+-- Existing functions with teleportation integration
 function vuln.findAndEquipFruit(fruitType)
     if not player.Character then return false end
     local backpack = player:FindFirstChild("Backpack")
@@ -51,11 +89,13 @@ function vuln.findAndEquipFruit(fruitType)
     end
     return false
 end
+
 function vuln.submitToFox()
     if ZenQuestRemoteEvent then
         ZenQuestRemoteEvent:FireServer("SubmitToFox")
     end
 end
+
 function vuln.returnItemToBackpack()
     if not player.Character then return end
     local backpack = player:FindFirstChild("Backpack")
@@ -67,8 +107,13 @@ function vuln.returnItemToBackpack()
         end
     end
 end
+
+-- Enhanced auto vuln submission with teleportation
 function vuln.autoVulnSubmission()
     if not autoVulnEnabled then return end
+    
+    -- Store current position before starting
+    vuln.storeCurrentPosition()
     
     -- Tranquil first
     if vuln.findAndEquipFruit("Tranquil") then
@@ -87,10 +132,18 @@ function vuln.autoVulnSubmission()
         vuln.returnItemToBackpack()
         task.wait(0.1)
     end
+    
+    -- Wait for specified delay then teleport back
+    if storedPosition then
+        task.wait(teleportDelay)
+        vuln.teleportToStoredPosition()
+    end
 end
+
 function vuln.getAutoVulnStatus()
     return autoVulnEnabled
 end
+
 function vuln.toggleAutoVuln(enabled)
     autoVulnEnabled = enabled
     
@@ -107,7 +160,7 @@ function vuln.toggleAutoVuln(enabled)
             end
         end)
         
-        return true, "Auto Vuln Submission Started"
+        return true, "Auto Vuln Submission Started with " .. teleportDelay .. "s teleport delay"
     else
         if autoVulnConnection then
             task.cancel(autoVulnConnection)
@@ -118,4 +171,5 @@ function vuln.toggleAutoVuln(enabled)
         return true, "Auto Vuln Submission Stopped"
     end
 end
+
 return vuln
