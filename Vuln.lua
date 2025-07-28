@@ -72,20 +72,20 @@ function vuln.autoVulnSubmission()
     
     -- Tranquil first
     if vuln.findAndEquipFruit("Tranquil") then
-        task.wait(0.5)
+        task.wait(0.1)
         vuln.submitToFox()
-        task.wait(1)
+        task.wait(0.1)
         vuln.returnItemToBackpack()
-        task.wait(0.5)
+        task.wait(0.1)
     end
     
     -- Corrupt second
     if vuln.findAndEquipFruit("Corrupt") then
-        task.wait(0.5)
+        task.wait(0.1)
         vuln.submitToFox()
-        task.wait(1)
+        task.wait(0.1)
         vuln.returnItemToBackpack()
-        task.wait(0.5)
+        task.wait(0.1)
     end
 end
 function vuln.getAutoVulnStatus()
