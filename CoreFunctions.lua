@@ -402,7 +402,18 @@ end
 function CoreFunctions.canHarvest(Plant)
     local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
     if not Prompt then return false end
-    return true -- Remove the Prompt.Enabled check to harvest even when disabled
+    
+    -- Check if the prompt is actually enabled (meaning the plant is ready)
+    if not Prompt.Enabled then return false end
+    
+    -- Additional check: see if the plant has fruits ready to harvest
+    local Fruits = Plant:FindFirstChild("Fruits")
+    if Fruits then
+        local fruitsChildren = Fruits:GetChildren()
+        if #fruitsChildren == 0 then return false end
+    end
+    
+    return true
 end
 
 function CoreFunctions.getPlantMutations(Plant)
@@ -497,46 +508,50 @@ end
 
 function CoreFunctions.harvestPlant(Plant)
     local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
-    if Prompt then
+    if Prompt and Prompt.Enabled then -- Only harvest if prompt is enabled (plant is ready)
+        
+        -- Method 1: Try setting MaxActivationDistance to a very large number
+        local originalMaxDistance = Prompt.MaxActivationDistance
+        Prompt.MaxActivationDistance = 9999999
+        
+        local success = pcall(function()
+            fireproximityprompt(Prompt)
+        end)
+        
+        -- Restore original distance
+        Prompt.MaxActivationDistance = originalMaxDistance
+        
+        if success then
+            return true
+        end
+        
+        -- Method 2: Try moving the prompt closer temporarily
         local Players = game:GetService("Players")
         local LocalPlayer = Players.LocalPlayer
         local character = LocalPlayer.Character
         
         if character and character:FindFirstChild("HumanoidRootPart") then
             local humanoidRootPart = character.HumanoidRootPart
-            local originalPosition = humanoidRootPart.CFrame
+            local promptParent = Prompt.Parent
+            local originalParent = promptParent.Parent
+            local originalCFrame = promptParent.CFrame
             
-            -- Temporarily teleport close to the plant
-            local plantPosition = Plant.PrimaryPart and Plant.PrimaryPart.CFrame or Plant:FindFirstChild("Base") and Plant.Base.CFrame
-            if plantPosition then
-                humanoidRootPart.CFrame = plantPosition + Vector3.new(0, 5, 0) -- Teleport slightly above the plant
+            -- Temporarily move the prompt's parent close to player
+            if promptParent and promptParent:IsA("BasePart") then
+                promptParent.CFrame = humanoidRootPart.CFrame + Vector3.new(0, 0, -5)
                 
-                -- Wait a brief moment and then fire the prompt
-                task.wait(0.1)
-                
-                -- Force the prompt to be available
-                Prompt.MaxActivationDistance = math.huge
-                Prompt.Enabled = true
-                Prompt.RequiresLineOfSight = false
-                
+                task.wait(0.05)
                 fireproximityprompt(Prompt)
+                task.wait(0.05)
                 
-                -- Wait a moment for the collection to register
-                task.wait(0.1)
-                
-                -- Teleport back to original position
-                humanoidRootPart.CFrame = originalPosition
-                
+                -- Move it back
+                promptParent.CFrame = originalCFrame
                 return true
             end
         end
         
-        -- Fallback: try normal method if teleport failed
-        Prompt.MaxActivationDistance = math.huge
-        Prompt.Enabled = true
-        Prompt.RequiresLineOfSight = false
+        -- Method 3: Fallback - just try firing it normally
         fireproximityprompt(Prompt)
-        
         return true
     end
     return false
