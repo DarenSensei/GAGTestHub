@@ -32,7 +32,7 @@ end
 
 
 -- Load external functions with error handling
-local CoreFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GAGTestHub/refs/heads/main/CoreFunctions.lua", "CoreFunctions")
+local CoreFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/CoreFunctions.lua", "CoreFunctions")
 local AutoBuy = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/AutoBuy.lua", "AutoBuy")
 local PetFunctions = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/PetMiddleFunctions.lua", "PetFunctions")
 local LocalPlayer = safeLoad("https://raw.githubusercontent.com/DarenSensei/GrowAFilipino/refs/heads/main/LocalPlayer.lua", "LocalPlayer")
@@ -91,6 +91,7 @@ local StarterGui = game:GetService("StarterGui")
 local playerGui = player:WaitForChild("PlayerGui")
 local userInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService('VirtualUser')
 local PetMutationMachineService_RE = ReplicatedStorage.GameEvents.PetMutationMachineService_RE
 
 -- Variables initialization
@@ -106,6 +107,11 @@ local autoSellEnabled = false
 local sellDelay = 1
 local isProcessing = false
 local autoSellConnection
+local ZenAuraEnabled = false
+local ZenQuestEnabled = false
+local antiAFKEnabled = true -- Default toggle is on
+local connection
+local lastClickTime = tick()
 
 -- Sprinkler variables
 local sprinklerTypes = {"Basic Sprinkler", "Advanced Sprinkler", "Master Sprinkler", "Godly Sprinkler", "Honey Sprinkler", "Chocolate Sprinkler"}
@@ -129,7 +135,7 @@ local Window = WindUI:CreateWindow({
     SubTitle = "Grow A Garden",
     TabWidth = 160,
     Size = UDim2.fromOffset(470, 350),
-    Acrylic = true,
+    Transparent = true,
     Theme = "Dark"
 })
 
@@ -238,8 +244,8 @@ local MainTab = Window:Tab({
 })
 
 MainTab:Paragraph({
-    Title = "📜Changelogs : (v.1.2.5)",
-    Desc = "Added : Config",
+    Title = "📜Changelogs : (v.1.3.2)",
+    Desc = "Added : Anti AFK, Added Elder Straberry, Added New Items in Zenshop",
     color = "#c7c0b7",
 })
 
@@ -351,6 +357,39 @@ MainTab:Button({
         end
     end
 })
+
+local function performAntiAFK()
+    if antiAFKEnabled then
+        local currentTime = tick()
+        if currentTime - lastClickTime >= 600 then -- 10 minutes = 600 seconds
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+            lastClickTime = currentTime
+        end
+    end
+end
+
+local function enableAntiAFK()
+    if connection then connection:Disconnect() end
+    connection = RunService.Heartbeat:Connect(performAntiAFK)
+    lastClickTime = tick() -- Reset timer when enabled
+end
+
+MainTab:Toggle({
+    Title = "Anti-AFK",
+    Value = true,
+    Callback = function(Value)
+        antiAFKEnabled = Value
+        if Value then
+            enableAntiAFK()
+        else
+            if connection then connection:Disconnect() end
+        end
+    end
+})
+
+-- Initialize
+enableAntiAFK()
 
 MainTab:Section({
     Title = "---- Local Player ----"
@@ -1154,6 +1193,12 @@ VulnTab:Paragraph({
     Icon = "zap"
 })
 
+VulnTab:Divider()
+
+VulnTab:Section({
+    Title = "-- Auto Submit Kitsune --"
+})
+
 VulnTab:Toggle({
     Title = "Auto Submit to Fox",
     Value = safeCall(vuln.getAutoVulnStatus, "getAutoVulnStatus") or false,
@@ -1167,6 +1212,30 @@ VulnTab:Toggle({
                 Duration = 2,
                 Icon = enabled and "check-circle" or "x-circle"
             })
+        end
+    end
+})
+
+VulnTab:Input({
+    Title = "Teleport Delay",
+    Desc = "Delay before teleporting back (seconds)",
+    Placeholder = "Enter delay in seconds...",
+    Callback = function(value)
+        local delay = tonumber(value)
+        if delay and delay >= 0.1 then
+            vuln.setTeleportDelay(delay)
+        end
+    end
+})
+
+VulnTab:Input({
+    Title = "Wait Duration", 
+    Desc = "How long to wait at old position (seconds)",
+    Placeholder = "Enter wait time in seconds (default: 30)...",
+    Callback = function(value)
+        local duration = tonumber(value)
+        if duration and duration >= 0.1 then
+            vuln.setWaitDuration(duration)
         end
     end
 })
@@ -1223,23 +1292,42 @@ VulnTab:Section({
         Title = "-- Zen Auto --"
     })
 
-VulnTab:Button({
+VulnTab:Toggle({
     Title = "Zen Aura Submit",
-    Desc = "Submit all plants for Zen Aura",
+    Desc = "Auto-submit all plants for Zen Aura every 5 seconds",
     Icon = "leaf",
-    Callback = function()
-        game:GetService("ReplicatedStorage").GameEvents.ZenAuraRemoteEvent:FireServer("SubmitAllPlants")
+    Default = false,
+    Callback = function(Value)
+        ZenAuraEnabled = Value
+        if Value then
+            task.spawn(function()
+                while ZenAuraEnabled do
+                    game:GetService("ReplicatedStorage").GameEvents.ZenAuraRemoteEvent:FireServer("SubmitAllPlants")
+                    task.wait(5)
+                end
+            end)
+        end
     end
 })
 
-VulnTab:Button({
+VulnTab:Toggle({
     Title = "Zen Quest Submit", 
-    Desc = "Submit all plants for Zen Quest",
+    Desc = "Auto-submit all plants for Zen Quest every 5 seconds",
     Icon = "target",
-    Callback = function()
-        game:GetService("ReplicatedStorage").GameEvents.ZenQuestRemoteEvent:FireServer("SubmitAllPlants")
+    Default = false,
+    Callback = function(Value)
+        ZenQuestEnabled = Value
+        if Value then
+            task.spawn(function()
+                while ZenQuestEnabled do
+                    game:GetService("ReplicatedStorage").GameEvents.ZenQuestRemoteEvent:FireServer("SubmitAllPlants")
+                    task.wait(5)
+                end
+            end)
+        end
     end
 })
+
 
 -- ===========================================
 -- MISC TAB (Updated for WindUI)
