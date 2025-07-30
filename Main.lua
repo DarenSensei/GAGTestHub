@@ -93,6 +93,7 @@ local userInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualUser = game:GetService('VirtualUser')
 local PetMutationMachineService_RE = ReplicatedStorage.GameEvents.PetMutationMachineService_RE
+local Sell_Item = ReplicatedStorage.GameEvents.Sell_Item
 
 -- Variables initialization
 local selectedPets = {}
