@@ -93,7 +93,6 @@ local userInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualUser = game:GetService('VirtualUser')
 local PetMutationMachineService_RE = ReplicatedStorage.GameEvents.PetMutationMachineService_RE
-local Sell_Item = ReplicatedStorage.GameEvents.Sell_Item
 
 -- Variables initialization
 local selectedPets = {}
@@ -697,6 +696,81 @@ Farm:Input({
         local delay = tonumber(value)
         if delay and delay >= 0.1 then
             sellDelay = delay
+        end
+    end
+})
+
+Farm:Divider()
+
+Farm:Section({
+    Title = "-- Auto Sell Pet --"
+})
+
+-- Updated Dropdown with dynamic pet detection
+local petDropdown = Farm:Dropdown({
+    Title = "Select Pets to Auto-Sell",
+    Values = {"All Pets"}, -- Start with just "All Pets" to avoid errors
+    Multi = true,
+    AllowNone = true,
+    Callback = function(selectedValues)
+        local selectedPetsTable = {}
+        
+        if selectedValues and #selectedValues > 0 then
+            local hasAllPets = false
+            for _, value in pairs(selectedValues) do
+                if value == "All Pets" then
+                    hasAllPets = true
+                    break
+                end
+            end
+            
+            if hasAllPets then
+                selectedPetsTable["All Pets"] = true
+            else
+                for _, petName in pairs(selectedValues) do
+                    selectedPetsTable[petName] = true
+                end
+            end
+        end
+        
+        CoreFunctions.setSelectedPets(selectedPetsTable)
+    end
+})
+
+-- Function to refresh the dropdown with current pets
+function CoreFunctions.refreshPetDropdown()
+    if petDropdown and petDropdown.SetValues then
+        petDropdown:SetValues(CoreFunctions.getCurrentPets())
+    end
+end
+
+-- Optional: Add a button to manually refresh the pet list
+Farm:Button({
+    Title = "Refresh Pet List",
+    Desc = "Scan backpack for current pets",
+    Callback = function()
+        CoreFunctions.refreshPetDropdown()
+    end
+})
+
+-- Updated Toggle:
+Farm:Toggle({
+    Title = "Enable Auto Sell Pet",
+    Desc = "Auto-sell Pet",
+    Icon = "dollar-sign",
+    Default = false,
+    Callback = function(Value)
+        autoSellEnabled = Value
+        if Value then
+            -- Refresh pets when enabling auto-sell
+            CoreFunctions.refreshPetDropdown()
+            
+            task.spawn(function()
+                while autoSellEnabled do
+                    CoreFunctions.autoSellSelectedPets()
+                    task.wait(1) -- Increased wait time between full cycles
+                end
+            end)
         end
     end
 })
