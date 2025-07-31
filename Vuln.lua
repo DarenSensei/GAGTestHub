@@ -160,7 +160,7 @@ function vuln.autoVulnSubmission()
             vuln.submitToFox()
             task.wait(0.1)
             vuln.returnItemToBackpack()
-            task.wait(0.1)
+            task.wait(0.7)
         end
         
         -- Corrupt second - find, submit, return to backpack
@@ -169,7 +169,7 @@ function vuln.autoVulnSubmission()
             vuln.submitToFox()
             task.wait(0.1)
             vuln.returnItemToBackpack()
-            task.wait(0.1)
+            task.wait(0.7)
         end
         
         task.wait(0.1) -- Small delay between complete cycles
