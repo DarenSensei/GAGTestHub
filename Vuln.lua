@@ -15,7 +15,7 @@ local ZenQuestRemoteEvent = GameEvents:WaitForChild("ZenQuestRemoteEvent")
 local autoVulnEnabled = false
 local autoVulnConnection = nil
 local farmDuration = 60 -- How long to farm at teleport position (seconds)
-local waitDuration = 30 -- How long to wait at old position (seconds)
+local waitDuration = 10 -- How long to wait at old position (seconds)
 local storedPosition = nil
 local teleportPosition = CFrame.new(-102.564087, 2.99999976, -9.10526657) -- Default from your debug info
 
@@ -156,20 +156,20 @@ function vuln.autoVulnSubmission()
     while autoVulnEnabled and (tick() - farmStartTime) < farmDuration do
         -- Tranquil first - find, submit, return to backpack
         if vuln.findAndEquipFruit("Tranquil") then
-            task.wait(0.6)
+            task.wait(0.1)
             vuln.submitToFox()
-            task.wait(0.6)
+            task.wait(0.1)
             vuln.returnItemToBackpack()
-            task.wait(0.9)
+            task.wait(0.7)
         end
         
         -- Corrupt second - find, submit, return to backpack
         if vuln.findAndEquipFruit("Corrupt") then
-            task.wait(0.6)
+            task.wait(0.1)
             vuln.submitToFox()
-            task.wait(0.6)
+            task.wait(0.1)
             vuln.returnItemToBackpack()
-            task.wait(0.8)
+            task.wait(0.7)
         end
         
         task.wait(0.1) -- Small delay between complete cycles
