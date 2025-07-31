@@ -158,7 +158,7 @@ function vuln.autoVulnSubmission()
         if vuln.findAndEquipFruit("Tranquil") then
             task.wait(0.1)
             vuln.submitToFox()
-            task.wait(0.3)
+            task.wait(0.1)
             vuln.returnItemToBackpack()
             task.wait(0.7)
         end
@@ -167,12 +167,12 @@ function vuln.autoVulnSubmission()
         if vuln.findAndEquipFruit("Corrupt") then
             task.wait(0.1)
             vuln.submitToFox()
-            task.wait(0.3)
+            task.wait(0.1)
             vuln.returnItemToBackpack()
             task.wait(0.7)
         end
         
-        task.wait(0.1) -- Small delay between complete cycles
+        task.wait(0.9) -- Small delay between complete cycles
     end
     
     -- Return to stored position
