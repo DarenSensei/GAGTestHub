@@ -156,7 +156,7 @@ function vuln.autoVulnSubmission()
     while autoVulnEnabled and (tick() - farmStartTime) < farmDuration do
         -- Tranquil first - find, submit, return to backpack
         if vuln.findAndEquipFruit("Tranquil") then
-            task.wait(0.7)
+            task.wait(0.1)
             vuln.submitToFox()
             task.wait(0.7)
             vuln.returnItemToBackpack()
@@ -165,7 +165,7 @@ function vuln.autoVulnSubmission()
         
         -- Corrupt second - find, submit, return to backpack
         if vuln.findAndEquipFruit("Corrupt") then
-            task.wait(0.7)
+            task.wait(0.1)
             vuln.submitToFox()
             task.wait(0.7)
             vuln.returnItemToBackpack()
