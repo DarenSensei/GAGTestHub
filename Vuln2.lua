@@ -166,11 +166,9 @@ function vuln.autoVulnSubmission()
     while autoVulnEnabled and (tick() - farmStartTime) < farmDuration do
         local fruitType = useTranquil and "Tranquil" or "Corrupt"
         
-        -- Try to find and equip the current fruit type
-        if vuln.findAndEquipFruit(fruitType) then
-            task.wait(0.1) -- Brief wait after equipping
-            vuln.submitToFox()
-        end
+        -- Unequip, find and equip, submit, switch
+        vuln.findAndEquipFruit(fruitType)
+        vuln.submitToFox()
         
         -- Switch to the other fruit type for next iteration
         useTranquil = not useTranquil
