@@ -706,45 +706,58 @@ Farm:Section({
     Title = "-- Auto Sell Pet --"
 })
 
--- Updated Dropdown with dynamic pet detection
-local petDropdown = Farm:Dropdown({
-    Title = "Select Pets to Auto-Sell",
-    Values = {"All Pets"}, -- Start with just "All Pets" to avoid errors
-    Multi = true,
-    AllowNone = true,
-    Callback = function(selectedValues)
-        local selectedPetsTable = {}
-        
-        if selectedValues and #selectedValues > 0 then
-            local hasAllPets = false
-            for _, value in pairs(selectedValues) do
-                if value == "All Pets" then
-                    hasAllPets = true
-                    break
+-- Create dropdown with auto-loading
+task.spawn(function()
+    -- Wait for player character and backpack to load
+    if not player.Character then
+        player.CharacterAdded:Wait()
+    end
+    
+    -- Wait a bit more for backpack to populate
+    task.wait(2)
+    
+    -- Create dropdown with current pets
+    petDropdown = Farm:Dropdown({
+        Title = "Select Pets to Auto-Sell",
+        Values = CoreFunctions.getCurrentPets(),
+        Multi = true,
+        AllowNone = true,
+        Callback = function(selectedValues)
+            local selectedPetsTable = {}
+            
+            if selectedValues and #selectedValues > 0 then
+                local hasAllPets = false
+                for _, value in pairs(selectedValues) do
+                    if value == "All Pets" then
+                        hasAllPets = true
+                        break
+                    end
+                end
+                
+                if hasAllPets then
+                    selectedPetsTable["All Pets"] = true
+                else
+                    for _, petName in pairs(selectedValues) do
+                        selectedPetsTable[petName] = true
+                    end
                 end
             end
             
-            if hasAllPets then
-                selectedPetsTable["All Pets"] = true
-            else
-                for _, petName in pairs(selectedValues) do
-                    selectedPetsTable[petName] = true
-                end
-            end
+            CoreFunctions.setSelectedPets(selectedPetsTable)
+            print("Selected pets:", selectedPetsTable) -- Debug print
         end
-        
-        CoreFunctions.setSelectedPets(selectedPetsTable)
-    end
-})
+    })
+    
+    -- Auto-refresh every 5 seconds
+    task.spawn(function()
+        while true do
+            task.wait(5)
+            CoreFunctions.refreshPetDropdown()
+        end
+    end)
+end)
 
--- Function to refresh the dropdown with current pets
-function CoreFunctions.refreshPetDropdown()
-    if petDropdown and petDropdown.SetValues then
-        petDropdown:SetValues(CoreFunctions.getCurrentPets())
-    end
-end
-
--- Optional: Add a button to manually refresh the pet list
+-- Manual refresh button
 Farm:Button({
     Title = "Refresh Pet List",
     Desc = "Scan backpack for current pets",
@@ -753,7 +766,7 @@ Farm:Button({
     end
 })
 
--- Updated Toggle:
+-- Auto-sell toggle
 Farm:Toggle({
     Title = "Enable Auto Sell Pet",
     Desc = "Auto-sell Pet",
@@ -768,7 +781,7 @@ Farm:Toggle({
             task.spawn(function()
                 while autoSellEnabled do
                     CoreFunctions.autoSellSelectedPets()
-                    task.wait(1) -- Increased wait time between full cycles
+                    task.wait(1) -- Wait time between full cycles
                 end
             end)
         end
