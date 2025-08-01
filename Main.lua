@@ -707,65 +707,45 @@ Farm:Section({
 })
 
 -- UI Creation
-task.spawn(function()
-    while not Farm or not CoreFunctions do
-        task.wait(0.1)
-    end
-    
-    task.wait(0.5)
-    
-    local dropdownValues = {"All Pets"}
-    for _, petType in pairs(petTypes) do
-        table.insert(dropdownValues, petType)
-    end
-    
-    petSelectionDropdown = Farm:Dropdown({
-        Title = "Select Pets to Auto-Sell",
-        Values = dropdownValues,
-        Multi = true,
-        AllowNone = true,
-        Callback = function(selectedValues)
-            local selectedPetsTable = {}
-            
-            if selectedValues and #selectedValues > 0 then
-                local hasAllPets = false
-                for _, value in pairs(selectedValues) do
-                    if value == "All Pets" then
-                        hasAllPets = true
-                        break
-                    end
-                end
-                
-                if hasAllPets then
-                    selectedPetsTable["All Pets"] = true
-                else
-                    for _, petName in pairs(selectedValues) do
-                        selectedPetsTable[petName] = true
-                    end
-                end
-            end
-            
-            CoreFunctions.setSelectedPets(selectedPetsTable)
-        end
-    })
-    
-    autoSellToggle = Farm:Toggle({
-        Title = "Enable Auto Sell Pet",
-        Desc = "Auto-sell selected pets",
-        Default = false,
-        Callback = function(Value)
-            autoSellEnabled = Value
-            if Value then
-                task.spawn(function()
-                    while autoSellEnabled do
-                        CoreFunctions.autoSellSelectedPets()
-                        task.wait(1)
-                    end
-                end)
+-- Pet Selection Dropdown
+local petDropdown = Farm:Dropdown({
+    Title = "Select Pets to Auto Sell",
+    Values = safeCall(CoreFunctions.getPetList, "getPetList") or {},
+    Value = {},
+    Multi = true,
+    AllowNone = true,
+    Callback = function(selectedValues)
+        local selectedPets = {}
+        
+        if selectedValues and #selectedValues > 0 then
+            for _, petName in pairs(selectedValues) do
+                selectedPets[petName] = true
             end
         end
-    })
-end)
+        
+        safeCall(CoreFunctions.setSelectedPets, "setSelectedPets", selectedPets)
+    end
+})
+
+-- Auto Sell Toggle
+Farm:Toggle({
+    Title = "Enable Auto Sell Pet",
+    Value = safeCall(CoreFunctions.getAutoSellStatus, "getAutoSellStatus") or false,
+    Icon = "dollar-sign",
+    Callback = function(enabled)
+        local success, message = safeCall(CoreFunctions.toggleAutoSell, "toggleAutoSell", enabled)
+        
+        -- Only notify on errors or important status changes
+        if not success then
+            WindUI:Notify({
+                Title = "Auto Sell Pet",
+                Content = message or "Error toggling auto sell",
+                Duration = 3,
+                Icon = "alert-triangle"
+            })
+        end
+    end
+})
 -- Glitch TAB
 local Tab = Window:Tab({
     Title = "Glitch",
