@@ -1,5 +1,5 @@
--- Complete CoreFunctions for Grow A Garden Script Loader
 -- External Module for MAIN
+-- UPDATED AGAIN
 local CoreFunctions = {}
 
 -- Services
@@ -23,33 +23,6 @@ local sprinklerTypes = {
     "Chocolate Sprinkler"
 }
 local selectedSprinklers = {}
-
-local zenItems = {
-    "Zen Seed Pack",
-    "Zen Egg",
-    "Hot Spring",
-    "Zen Flare",
-    "Zen Crate",
-    "Soft Sunshine",
-    "Koi",
-    "Zen Gnome Crate",
-    "Spiked Mango",
-    "Pet Shard Tranquil",
-    "Zen Sand"
-}
-
-local merchantItems = {
-    "Star Caller",
-    "Night Staff",
-    "Bee Egg",
-    "Honey Sprinkler",
-    "Flower Seed Pack",
-    "Cloudtouched Spray",
-    "Mutation Spray Disco",
-    "Mutation Spray Verdant",
-    "Mutation Spray Windstruck",
-    "Mutation Spray Wet"
-}
 
 local LocalPlayer = Players.LocalPlayer
 local Farms = workspace.Farm
@@ -129,64 +102,280 @@ pcall(function()
 end)
 
 -- ==========================================
--- AUTO-BUY FUNCTIONS
+-- AUTO-SELL PET FUNCTIONS
 -- ==========================================
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
-function CoreFunctions.toggleAutoBuyZen(enabled)
-    autoBuyZenEnabled = enabled
+-- Player
+local player = Players.LocalPlayer
+
+-- Remote
+local SellPet_RE = ReplicatedStorage.GameEvents.SellPet_RE -- RemoteEvent 
+
+-- Pet list
+local petlist = {
+    "Bear Bee", "Blood Owl", "Brown Mouse", "Bunny", "Butterfly", "Capybara",
+    "Caterpillar", "Corrupted Kodama", "Corrupted Kitsune", "Crab", "Disco Bee",
+    "Dog", "Dragonfly", "Flamingo", "Golden Lab", "Grey Mouse", "Hedgehog",
+    "Honey Bee", "Kitsune", "Kodama", "Koi", "Maneki-neko", "Mimic Octopus",
+    "Moth", "Nihonzaru", "Ostrich", "Pack Bee", "Peacock", "Petal Bee",
+    "Polar Bear", "Praying Mantis", "Queen Bee", "Raiju", "Raptor", "Red Fox",
+    "Red Giant Ant", "Scarlet Macaw", "Sea Turtle", "Seagull", "Seal",
+    "Shiba Inu", "Silver Monkey", "Snail", "Squirrel", "Tanchozuru", "Tanuki",
+    "Tarantula Hawk", "Toucan", "Wasp"
+}
+
+-- Auto sell variables
+local autoSellEnabled = false
+local selectedPetsToSell = {}
+local autoSellConnection = nil
+local lastSellTime = 0
+local sellCooldown = 0.3 -- seconds between sells
+
+-- Function to get pet list
+function CoreFunctions.getPetList()
+    return petlist
+end
+
+-- Function to get selected pets
+function CoreFunctions.getSelectedPets()
+    return selectedPetsToSell
+end
+
+-- Function to set selected pets
+function CoreFunctions.setSelectedPets(pets)
+    selectedPetsToSell = pets or {}
+    return true, "Selected pets updated"
+end
+
+-- Function to get auto sell status
+function CoreFunctions.getAutoSellStatus()
+    return autoSellEnabled
+end
+
+-- Function to find and equip pet (improved)
+function CoreFunctions.findAndEquipPet(petType)
+    if not player.Character then return false end
+    local backpack = player:FindFirstChild("Backpack")
+    if not backpack then return false end
     
-    if enabled then
-        if zenBuyConnection then zenBuyConnection:Disconnect() end
-        zenBuyConnection = RunService.Heartbeat:Connect(function()
-            if autoBuyZenEnabled then
-                CoreFunctions.buyAllZenItems()
-                task.wait(1) -- Prevent spam
+    -- First try exact name match
+    local pet = backpack:FindFirstChild(petType)
+    if pet and pet:IsA("Tool") then
+        pet.Parent = player.Character
+        return true
+    end
+    
+    -- Try case insensitive exact match
+    local lowerPetType = string.lower(petType)
+    for _, item in pairs(backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            local lowerItemName = string.lower(item.Name)
+            if lowerItemName == lowerPetType then
+                item.Parent = player.Character
+                return true
             end
-        end)
-    else
-        if zenBuyConnection then
-            zenBuyConnection:Disconnect()
-            zenBuyConnection = nil
         end
     end
-end
-
-function CoreFunctions.toggleAutoBuyMerchant(enabled)
-    autoBuyMerchantEnabled = enabled
     
-    if enabled then
-        if merchantBuyConnection then merchantBuyConnection:Disconnect() end
-        merchantBuyConnection = RunService.Heartbeat:Connect(function()
-            if autoBuyMerchantEnabled then
-                CoreFunctions.buyAllMerchantItems()
-                task.wait(1) -- Prevent spam
+    -- If exact match fails, try smart partial matching
+    for _, item in pairs(backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            local lowerItemName = string.lower(item.Name)
+            
+            -- Split both names into words and check if petType matches any complete word sequence
+            local function matchesAsWord(fullName, targetName)
+                -- Handle hyphenated words by replacing hyphens with spaces for comparison
+                local normalizedFull = string.gsub(fullName, "%-", " ")
+                local normalizedTarget = string.gsub(targetName, "%-", " ")
+                
+                -- Check if target appears as complete word(s) in the full name
+                local pattern = "%f[%w]" .. string.gsub(normalizedTarget, "%s+", "%%s+") .. "%f[%W]"
+                return string.find(normalizedFull, pattern) ~= nil
             end
-        end)
-    else
-        if merchantBuyConnection then
-            merchantBuyConnection:Disconnect()
-            merchantBuyConnection = nil
+            
+            if matchesAsWord(lowerItemName, lowerPetType) then
+                item.Parent = player.Character
+                return true
+            end
         end
     end
+    
+    return false
 end
 
-function CoreFunctions.buyAllZenItems()
-    if not BuyEventShopStock then return end
-    for _, item in pairs(zenItems) do
-        pcall(function()
-            BuyEventShopStock:FireServer(item)
-        end)
+-- Function to check if pet is equipped
+function CoreFunctions.isPetEquipped()
+    if not player.Character then return false end
+    
+    for _, item in pairs(player.Character:GetChildren()) do
+        if item:IsA("Tool") then
+            return true, item
+        end
+    end
+    return false
+end
+
+-- Function to sell equipped pet
+function CoreFunctions.sellEquippedPet()
+    if not autoSellEnabled then return false, "Auto sell is disabled" end
+    
+    -- Check if a pet is actually equipped
+    local equipped, pet = CoreFunctions.isPetEquipped()
+    if not equipped then
+        return false, "No pet equipped"
+    end
+    
+    local success, error = pcall(function()
+        SellPet_RE:FireServer()
+    end)
+    
+    if success then
+        return true, "Pet sold successfully"
+    else
+        return false, "Error selling pet: " .. tostring(error)
     end
 end
 
-function CoreFunctions.buyAllMerchantItems()
-    if not BuyTravelingMerchantShopStock then return end
-    for _, item in pairs(merchantItems) do
-        pcall(function()
-            BuyTravelingMerchantShopStock:FireServer(item)
-        end)
+-- Main auto sell loop function (improved)
+local function autoSellLoop()
+    if not autoSellEnabled then return end
+    
+    local currentTime = tick()
+    if currentTime - lastSellTime < sellCooldown then
+        return -- Still in cooldown
+    end
+    
+    -- Check if any pets are selected to sell
+    local hasPetsToSell = false
+    for petName, shouldSell in pairs(selectedPetsToSell) do
+        if shouldSell then
+            hasPetsToSell = true
+            break
+        end
+    end
+    
+    if not hasPetsToSell then return end
+    
+    -- Check if already equipped pet should be sold
+    local equipped, equippedPet = CoreFunctions.isPetEquipped()
+    if equipped then
+        local shouldSellEquipped = false
+        for petName, shouldSell in pairs(selectedPetsToSell) do
+            if shouldSell then
+                local lowerPetName = string.lower(petName)
+                local lowerEquippedName = string.lower(equippedPet.Name)
+                
+                -- Same precise matching logic for equipped pets
+                if lowerEquippedName == lowerPetName then
+                    shouldSellEquipped = true
+                    break
+                else
+                    -- Handle hyphenated words by replacing hyphens with spaces for comparison
+                    local normalizedEquipped = string.gsub(lowerEquippedName, "%-", " ")
+                    local normalizedPet = string.gsub(lowerPetName, "%-", " ")
+                    
+                    local pattern = "%f[%w]" .. string.gsub(normalizedPet, "%s+", "%%s+") .. "%f[%W]"
+                    if string.find(normalizedEquipped, pattern) then
+                        shouldSellEquipped = true
+                        break
+                    end
+                end
+            end
+        end
+        
+        if shouldSellEquipped then
+            local success = CoreFunctions.sellEquippedPet()
+            if success then
+                lastSellTime = currentTime
+            end
+            return
+        end
+    end
+    
+    -- Try to equip and sell pets from backpack
+    local foundPet = false
+    for petName, shouldSell in pairs(selectedPetsToSell) do
+        if shouldSell and autoSellEnabled then
+            if CoreFunctions.findAndEquipPet(petName) then
+                foundPet = true
+                -- Quick equip check
+                task.wait(0.05)
+                local success = CoreFunctions.sellEquippedPet()
+                if success then
+                    lastSellTime = currentTime
+                end
+                break -- Only process one pet per cycle
+            end
+        end
+        
+        if not autoSellEnabled then break end
+    end
+    
+    -- If no pets were found to sell, reset cooldown to check again sooner
+    if not foundPet then
+        lastSellTime = currentTime - sellCooldown + 0.1
     end
 end
+
+-- Function to start auto sell
+function CoreFunctions.startAutoSell()
+    if autoSellConnection then
+        autoSellConnection:Disconnect()
+    end
+    
+    autoSellConnection = RunService.Heartbeat:Connect(autoSellLoop)
+    return true, "Auto sell started"
+end
+
+-- Function to stop auto sell
+function CoreFunctions.stopAutoSell()
+    if autoSellConnection then
+        autoSellConnection:Disconnect()
+        autoSellConnection = nil
+    end
+    
+    return true, "Auto sell stopped"
+end
+
+-- Function to toggle auto sell
+function CoreFunctions.toggleAutoSell(enabled)
+    autoSellEnabled = enabled
+    
+    if enabled then
+        -- Check if pets are selected
+        local hasPetsSelected = false
+        for _ in pairs(selectedPetsToSell) do
+            hasPetsSelected = true
+            break
+        end
+        
+        if not hasPetsSelected then
+            autoSellEnabled = false
+            return false, "Please select pets to sell first!"
+        end
+        
+        return CoreFunctions.startAutoSell()
+    else
+        return CoreFunctions.stopAutoSell()
+    end
+end
+
+-- Cleanup function
+function CoreFunctions.cleanup()
+    CoreFunctions.stopAutoSell()
+    selectedPetsToSell = {}
+    autoSellEnabled = false
+end
+
+-- Auto cleanup when player leaves
+game.Players.PlayerRemoving:Connect(function(leavingPlayer)
+    if leavingPlayer == player then
+        CoreFunctions.cleanup()
+    end
+end)
 
 -- ==========================================
 -- SHOVEL FUNCTIONS
