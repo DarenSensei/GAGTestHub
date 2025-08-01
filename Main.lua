@@ -706,20 +706,22 @@ Farm:Section({
     Title = "-- Auto Sell Pet --"
 })
 
--- Create dropdown with auto-loading
+-- UI Creation
 task.spawn(function()
-    -- Wait for player character and backpack to load
-    if not player.Character then
-        player.CharacterAdded:Wait()
+    while not Farm or not CoreFunctions do
+        task.wait(0.1)
     end
     
-    -- Wait a bit more for backpack to populate
-    task.wait(2)
+    task.wait(0.5)
     
-    -- Create dropdown with current pets
-    petDropdown = Farm:Dropdown({
+    local dropdownValues = {"All Pets"}
+    for _, petType in pairs(petTypes) do
+        table.insert(dropdownValues, petType)
+    end
+    
+    petSelectionDropdown = Farm:Dropdown({
         Title = "Select Pets to Auto-Sell",
-        Values = CoreFunctions.getCurrentPets(),
+        Values = dropdownValues,
         Multi = true,
         AllowNone = true,
         Callback = function(selectedValues)
@@ -744,50 +746,26 @@ task.spawn(function()
             end
             
             CoreFunctions.setSelectedPets(selectedPetsTable)
-            print("Selected pets:", selectedPetsTable) -- Debug print
         end
     })
     
-    -- Auto-refresh every 5 seconds
-    task.spawn(function()
-        while true do
-            task.wait(5)
-            CoreFunctions.refreshPetDropdown()
+    autoSellToggle = Farm:Toggle({
+        Title = "Enable Auto Sell Pet",
+        Desc = "Auto-sell selected pets",
+        Default = false,
+        Callback = function(Value)
+            autoSellEnabled = Value
+            if Value then
+                task.spawn(function()
+                    while autoSellEnabled do
+                        CoreFunctions.autoSellSelectedPets()
+                        task.wait(1)
+                    end
+                end)
+            end
         end
-    end)
+    })
 end)
-
--- Manual refresh button
-Farm:Button({
-    Title = "Refresh Pet List",
-    Desc = "Scan backpack for current pets",
-    Callback = function()
-        CoreFunctions.refreshPetDropdown()
-    end
-})
-
--- Auto-sell toggle
-Farm:Toggle({
-    Title = "Enable Auto Sell Pet",
-    Desc = "Auto-sell Pet",
-    Icon = "dollar-sign",
-    Default = false,
-    Callback = function(Value)
-        autoSellEnabled = Value
-        if Value then
-            -- Refresh pets when enabling auto-sell
-            CoreFunctions.refreshPetDropdown()
-            
-            task.spawn(function()
-                while autoSellEnabled do
-                    CoreFunctions.autoSellSelectedPets()
-                    task.wait(1) -- Wait time between full cycles
-                end
-            end)
-        end
-    end
-})
-
 -- Glitch TAB
 local Tab = Window:Tab({
     Title = "Glitch",
