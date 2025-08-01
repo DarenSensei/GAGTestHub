@@ -101,6 +101,14 @@ function vuln.findAndEquipFruit(fruitType)
     local backpack = player:FindFirstChild("Backpack")
     if not backpack then return false end
     
+    -- First, unequip any currently equipped tools
+    for _, item in pairs(player.Character:GetChildren()) do
+        if item:IsA("Tool") then
+            item.Parent = backpack
+        end
+    end
+    
+    -- Then find and equip the requested fruit type
     for _, item in pairs(backpack:GetChildren()) do
         if item:IsA("Tool") and string.find(item.Name, fruitType) and string.find(item.Name, "%[.+kg%]") then
             -- Check if item is blacklisted
@@ -140,7 +148,7 @@ function vuln.returnItemToBackpack()
     end
 end
 
--- Enhanced auto vuln submission with teleportation and looping
+-- Modified auto vuln submission with fast switching
 function vuln.autoVulnSubmission()
     if not autoVulnEnabled then return end
     
@@ -151,28 +159,24 @@ function vuln.autoVulnSubmission()
     vuln.teleportToFarmPosition()
     task.wait(0.5) -- Small delay to ensure teleport completes
     
-    -- Farm for specified duration
+    -- Farm for specified duration with alternating fruits
     local farmStartTime = tick()
+    local useTranquil = true -- Start with Tranquil
+    
     while autoVulnEnabled and (tick() - farmStartTime) < farmDuration do
-        -- Tranquil first - find, submit, return to backpack
-        if vuln.findAndEquipFruit("Tranquil") then
-            task.wait(0.7)
+        local fruitType = useTranquil and "Tranquil" or "Corrupt"
+        
+        -- Try to find and equip the current fruit type
+        if vuln.findAndEquipFruit(fruitType) then
+            task.wait(0.1) -- Brief wait after equipping
             vuln.submitToFox()
-            task.wait(0.7)
-            vuln.returnItemToBackpack()
-            task.wait(0.9)
         end
         
-        -- Corrupt second - find, submit, return to backpack
-        if vuln.findAndEquipFruit("Corrupt") then
-            task.wait(0.7)
-            vuln.submitToFox()
-            task.wait(0.7)
-            vuln.returnItemToBackpack()
-            task.wait(0.9)
-        end
+        -- Switch to the other fruit type for next iteration
+        useTranquil = not useTranquil
         
-        task.wait(0.1) -- Small delay between complete cycles
+        -- Wait 0.5 seconds before switching to the other fruit
+        task.wait(0.5)
     end
     
     -- Return to stored position
@@ -205,7 +209,7 @@ function vuln.toggleAutoVuln(enabled)
             end
         end)
         
-        return true, "Auto Vuln Submission Started - Farm: " .. farmDuration .. "s, Wait: " .. waitDuration .. "s"
+        return true, "Auto Vuln Submission Started - Fast Switch Mode (0.5s intervals) - Farm: " .. farmDuration .. "s, Wait: " .. waitDuration .. "s"
     else
         if autoVulnConnection then
             task.cancel(autoVulnConnection)
