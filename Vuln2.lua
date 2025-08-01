@@ -1,4 +1,4 @@
--- External module
+-- External module UPDATE
 local vuln = {}
 
 -- Services
@@ -167,8 +167,11 @@ function vuln.autoVulnSubmission()
         local fruitType = useTranquil and "Tranquil" or "Corrupt"
         
         -- Unequip, find and equip, submit, switch
-        vuln.findAndEquipFruit(fruitType)
-        vuln.submitToFox()
+        local equipped = vuln.findAndEquipFruit(fruitType)
+        if equipped then
+            task.wait(0.1) -- Small delay to ensure equip completes
+            vuln.submitToFox()
+        end
         
         -- Switch to the other fruit type for next iteration
         useTranquil = not useTranquil
