@@ -1,4 +1,4 @@
--- External module
+-- External module UPDATED
 local vuln = {}
 
 -- Services
@@ -162,8 +162,6 @@ function vuln.autoVulnSubmission()
         if vuln.findAndEquipFruit(fruitType) then
             task.wait(0.1) -- Brief wait after equipping
             vuln.submitToFox()
-            task.wait(0.1) -- Brief wait after submitting
-            vuln.returnItemToBackpack()
         end
         
         -- Switch to the other fruit type for next iteration
