@@ -176,7 +176,7 @@ function vuln.autoVulnSubmission()
         useTranquil = not useTranquil
         
         -- Wait 0.5 seconds before switching to the other fruit
-        task.wait(0.3)
+        task.wait(0.5)
     end
     
     -- Return to stored position
