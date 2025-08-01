@@ -1,4 +1,4 @@
--- External module UPDATED
+-- External module
 local vuln = {}
 
 -- Services
@@ -101,6 +101,14 @@ function vuln.findAndEquipFruit(fruitType)
     local backpack = player:FindFirstChild("Backpack")
     if not backpack then return false end
     
+    -- First, unequip any currently equipped tools
+    for _, item in pairs(player.Character:GetChildren()) do
+        if item:IsA("Tool") then
+            item.Parent = backpack
+        end
+    end
+    
+    -- Then find and equip the requested fruit type
     for _, item in pairs(backpack:GetChildren()) do
         if item:IsA("Tool") and string.find(item.Name, fruitType) and string.find(item.Name, "%[.+kg%]") then
             -- Check if item is blacklisted
